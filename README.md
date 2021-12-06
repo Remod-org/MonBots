@@ -3,11 +3,14 @@ Monument Bots!
 
 An EXPERIMENTAL basic plugin to provide for bots at Rust monuments otherwise recently evacuated and/or not yet populated by Facepunch.
 
-Work in progress to add a basic management GUI.  The default config (not so important) and data file (very important) after initial load will be where you want to look.
-
-For now, the data file is best edited while the plugin is unloaded.  These are the early days and improvements are coming.
+A basic management GUI has been created and can be accessed by ADMINS ONLY using the /mb command.
 
 SUBJECT TO CHANGE!
+
+## Command
+
+  -- `/mb` -- Starts the gui where you can select and edit profiles including bot names, kit selection, etc.
+      There are several other subcommands for this, all used by the gui and not yet documented.
 
 ## Configuration
 ```json
@@ -121,4 +124,6 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
 ```
 
 You can also adjust the startHealth and other values as you like.  Not everything is working yet, but they do fight and hide and do all of the usual NPC things you might expect.
+
+USE THE GUI - /mb
 
