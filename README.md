@@ -23,7 +23,7 @@ SUBJECT TO CHANGE!
   "Version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 1
+    "Patch": 3
   }
 }
 ```
@@ -42,8 +42,10 @@ Here is an example showing two monuments:
   "Sphere Tank 0": {
     "monname": "Sphere Tank 0",
     "spawnCount": 0,
+    "respawn": true,
     "respawnTime": 60.0,
     "detectRange": 60.0,
+    "spawnRange": 30,
     "roamRange": 140.0,
     "startHealth": 200.0,
     "invulnerable": false,
@@ -57,8 +59,10 @@ Here is an example showing two monuments:
   "Stables A 0": {
     "monname": "Stables A 0",
     "spawnCount": 0,
+    "respawn": true,
     "respawnTime": 60.0,
     "detectRange": 60.0,
+    "spawnRange": 30,
     "roamRange": 140.0,
     "startHealth": 200.0,
     "invulnerable": false,
@@ -83,8 +87,10 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
   "Sphere Tank 0": {
     "monname": "Sphere Tank 0",
     "spawnCount": 3,
+    "respawn": true,
     "respawnTime": 60.0,
     "detectRange": 60.0,
+    "spawnRange": 30,
     "roamRange": 140.0,
     "startHealth": 200.0,
     "invulnerable": false,
@@ -104,8 +110,10 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
   "Stables A 0": {
     "monname": "Stables A 0",
     "spawnCount": 5,
+    "respawn": true,
     "respawnTime": 60.0,
     "detectRange": 60.0,
+    "spawnRange": 30,
     "roamRange": 140.0,
     "startHealth": 200.0,
     "invulnerable": false,
