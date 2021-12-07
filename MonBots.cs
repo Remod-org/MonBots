@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.2")]
+    [Info("MonBots", "RFC1920", "1.0.3")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -93,11 +93,23 @@ namespace Oxide.Plugins
                 ["none"] = "None",
                 ["start"] = "Start",
                 ["end"] = "End",
+                ["edit"] = "Edit",
                 ["debug"] = "Debug set to {0}",
                 ["monbots"] = "MonBots",
                 ["needselect"] = "Select NPC",
                 ["select"] = "Select",
                 ["respawn"] = "Respawn",
+                ["spawncount"] = "Spawn Count",
+                ["spawnrange"] = "Spawn Range",
+                ["respawntime"] = "Respawn Time",
+                ["detectrange"] = "Detect Range",
+                ["roamrange"] = "Roam Range",
+                ["invulnerable"] = "Invulnerable",
+                ["lootable"] = "Lootable",
+                ["dropweapon"] = "DropWeapon",
+                ["name(s)"] = "Name(s)",
+                ["kit(s)"] = "Kit(s)",
+                ["hostile"] = "Hostile",
                 ["profile"] = "Profile",
                 ["editing"] = "Editing",
                 ["mustselect"] = "Please press 'Select' to choose an NPC.",
@@ -124,9 +136,31 @@ namespace Oxide.Plugins
 
             AddCovalenceCommand("mb", "cmdMB");
 
-            LoadData();
             FindMonuments();
+            LoadData();
             LoadBots();
+
+            foreach (string mon in monPos.Keys)
+            {
+                if (!spawnpoints.ContainsKey(mon))
+                {
+                    spawnpoints.Add(mon, new SpawnPoints()
+                    {
+                        monname = mon,
+                        dropWeapon = false,
+                        startHealth = 200f,
+                        respawn = true,
+                        lootable = true,
+                        hostile = false,
+                        spawnCount = 0,
+                        spawnRange = 30,
+                        respawnTime = 60f,
+                        detectRange = 60f,
+                        roamRange = 140f
+                    });
+                }
+            }
+
             SaveData();
 
             foreach (BasePlayer player in BasePlayer.activePlayerList)
@@ -190,6 +224,18 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "sr":
+                        {
+                            int intval = int.Parse(args.Last());
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            newarg.RemoveAt(newarg.Count - 1);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].spawnRange = intval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "rt":
                         {
                             int intval = int.Parse(args.Last());
@@ -222,6 +268,16 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].roamRange = fval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "rs":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].respawn = !spawnpoints[monname].respawn;
                             SaveData();
                             NPCProfileEditGUI(player, monname);
                         }
@@ -418,40 +474,60 @@ namespace Oxide.Plugins
             int row = 0;
             float[] posb = GetButtonPositionP(row, col);
 
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "SpawnCount", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawncount"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "RespawnTime", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawnrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "DetectRange", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawn"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "RoamRange", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawntime"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "Invulnerable", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("detectrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "Lootable", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("roamrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "DropWeapon", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("invulnerable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "Hostile", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("lootable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("dropweapon"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("hostile"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
 
             col = 3; row = 0;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "Name(s)", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("name(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), "Kit(s)", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("kit(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
 
             col = 1; row = 0;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnCount.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb sc {profile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb sr {profile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.respawn)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rs {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rs {profile}");
+            }
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.respawnTime.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
@@ -519,7 +595,7 @@ namespace Oxide.Plugins
             if (sp.names != null)
             {
                 string names = string.Join(" ", sp.names);
-                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), names, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), names, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + posb[2] - posb[0]} {posb[3]}");
             }
 
             row++;
@@ -618,7 +694,7 @@ namespace Oxide.Plugins
             if (player == null) return;
             CuiHelper.DestroyUi(player, NPCGUK);
 
-            string description = Lang("npcguikit");
+            string description = Lang("npcguikit") + ": " + profile;
             CuiElementContainer container = UI.Container(NPCGUK, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, NPCGUK, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
             UI.Button(ref container, NPCGUK, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selkitclose");
@@ -678,7 +754,7 @@ namespace Oxide.Plugins
             NextTick(() =>
             {
                 string botname = GetBotName(sp.names.ToArray());
-                DoLog($"Spawning bot {botname} at {sp.monname}");
+                DoLog($"Spawning bot {botname} at {sp.monname} ({pos.ToString()})");
                 MonBotPlayer mono = bot.gameObject.AddComponent<MonBotPlayer>();
                 mono.spawnPos = pos;
                 mono.info = new MonBotInfo(bot.userID, bot.transform.position, bot.transform.rotation)
@@ -694,7 +770,7 @@ namespace Oxide.Plugins
                     detectRange = sp.detectRange,
                     roamRange = sp.roamRange,
                     respawnTimer = sp.respawnTime,
-                    respawn = true,
+                    respawn = sp.respawn,
                     loc = pos,
                     kit = kit
                 };
@@ -736,6 +812,11 @@ namespace Oxide.Plugins
             Dictionary<string, SpawnPoints> newpoints = new Dictionary<string, SpawnPoints>(spawnpoints);
             foreach (KeyValuePair<string, SpawnPoints> sp in spawnpoints)
             {
+                //if (!monPos.ContainsKey(sp.Key))
+                //{
+                //    Puts($"Unmatched monument name {sp.Key} in data file");
+                //    continue;
+                //}
                 if (monument.Length > 0 && !sp.Key.Equals(monument)) continue;
 
                 DoLog($"Working on spawn at {sp.Key}");
@@ -754,8 +835,9 @@ namespace Oxide.Plugins
                     }
 
                     Vector3 pos = monPos[sp.Key];
-                    int x = UnityEngine.Random.Range(-15, 15);
-                    int z = UnityEngine.Random.Range(-15, 15);
+                    int spawnRange = sp.Value.spawnRange > 0 ? sp.Value.spawnRange : 15;
+                    int x = UnityEngine.Random.Range(-spawnRange, spawnRange);
+                    int z = UnityEngine.Random.Range(-spawnRange, spawnRange);
                     pos.y = TerrainMeta.HeightMap.GetHeight(pos);
                     pos += new Vector3(x, 0, z);
 
@@ -858,17 +940,21 @@ namespace Oxide.Plugins
             MonBotPlayer hp = npc.GetComponent<MonBotPlayer>();
             if (hp == null) return;
 
-            //if (hp.info.dropWeapon)
-            //{
-            //    Item activeItem = hp.player.GetActiveItem();
-            //    if (activeItem != null)
-            //    {
-            //        DoLog($"Dropping {hp.info.displayName}'s activeItem: {activeItem.info.shortname}");
-            //        activeItem.Drop(npc.eyes.position, new Vector3(), new Quaternion());
-            //        npc.svActiveItemID = 0;
-            //        npc.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
-            //    }
-            //}
+            if (!hp.info.lootable)
+            {
+                npc.inventory?.Strip();
+            }
+            else if (hp.info.dropWeapon)
+            {
+                Item activeItem = npc.GetActiveItem();
+                if (activeItem != null)
+                {
+                    DoLog($"Dropping {hp.info.displayName}'s activeItem: {activeItem.info.shortname}");
+                    activeItem.Drop(npc.eyes.position, new Vector3(), new Quaternion());
+                    npc.svActiveItemID = 0;
+                    npc.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
+                }
+            }
 
             DoLog("Checking respawn variable");
             if (hp?.info.respawn == true)
@@ -1244,11 +1330,13 @@ namespace Oxide.Plugins
         {
             public string monname;
             public int spawnCount;
+            public int spawnRange;
             public float respawnTime;
             public float detectRange;
             public float roamRange;
             public float startHealth;
             public bool invulnerable;
+            public bool respawn;
             public bool lootable;
             public bool dropWeapon;
             public bool hostile;
@@ -1713,25 +1801,6 @@ namespace Oxide.Plugins
                 Version = Version
             };
             SaveConfig(config);
-
-            spawnpoints = new Dictionary<string, SpawnPoints>();
-            FindMonuments();
-            foreach (string mon in monPos.Keys)
-            {
-                spawnpoints.Add(mon, new SpawnPoints()
-                {
-                    monname = mon,
-                    dropWeapon = false,
-                    startHealth = 200f,
-                    lootable = true,
-                    hostile = false,
-                    spawnCount = 0,
-                    respawnTime = 60f,
-                    detectRange = 60f,
-                    roamRange = 140f
-                });
-            }
-            SaveData();
         }
 
         private void LoadConfigVariables()
