@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.3")]
+    [Info("MonBots", "RFC1920", "1.0.4")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -52,7 +52,8 @@ namespace Oxide.Plugins
         private const string NPCGUK = "npc.kitselect";
         private const string NPCGUM = "npc.monselect";
         private const string NPCGUN = "npc.kitsetnames";
-        private readonly List<string> guis = new List<string>() { NPCGUI, NPCGUK, NPCGUM, NPCGUN };
+        private const string NPCGUP = "npc.newprofile";
+        private readonly List<string> guis = new List<string>() { NPCGUI, NPCGUK, NPCGUM, NPCGUN, NPCGUP };
 
         private bool newsave;
 
@@ -87,13 +88,15 @@ namespace Oxide.Plugins
             {
                 ["npcgui"] = "MonBot GUI",
                 ["npcguikit"] = "MonBot GUI Kit Select",
-                ["npcguimon"] = "MonBot GUI Monument Select",
+                ["npcguimon"] = "MonBot GUI Profile Select",
                 ["npcguinames"] = "MonBot GUI Bot Names",
                 ["close"] = "Close",
+                ["at"] = "at",
                 ["none"] = "None",
                 ["start"] = "Start",
                 ["end"] = "End",
                 ["edit"] = "Edit",
+                ["delete"] = "DELETE",
                 ["debug"] = "Debug set to {0}",
                 ["monbots"] = "MonBots",
                 ["needselect"] = "Select NPC",
@@ -116,7 +119,9 @@ namespace Oxide.Plugins
                 ["guihelp1"] = "For blue buttons, click to toggle true/false.",
                 ["guihelp2"] = "For all values above in gray, you may type a new value and press enter.",
                 ["guihelp3"] = "For kit, press the button to select a kit.",
+                ["cancel"] = "Cancel",
                 ["add"] = "Add",
+                ["addhere"] = "Add Here",
                 ["new"] = "Create New",
                 ["remove"] = "Remove",
                 ["spawnhere"] = "Spawn Here",
@@ -140,13 +145,14 @@ namespace Oxide.Plugins
             LoadData();
             LoadBots();
 
-            foreach (string mon in monPos.Keys)
+            foreach (KeyValuePair<string, Vector3> mon in monPos)
             {
-                if (!spawnpoints.ContainsKey(mon))
+                if (!spawnpoints.ContainsKey(mon.Key))
                 {
-                    spawnpoints.Add(mon, new SpawnPoints()
+                    spawnpoints.Add(mon.Key, new SpawnPoints()
                     {
-                        monname = mon,
+                        monname = mon.Key,
+                        monpos = mon.Value,
                         dropWeapon = false,
                         startHealth = 200f,
                         respawn = true,
@@ -366,6 +372,27 @@ namespace Oxide.Plugins
                             NPCNamesGUI(player, monname);
                         }
                         break;
+                    case "delete":
+                        {
+                            CuiHelper.DestroyUi(player, NPCGUI);
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+
+                            foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsOfType<MonBotPlayer>())
+                            {
+                                if (bot.info.monument == monname)
+                                {
+                                    DoLog($"Killing bot {bot.info.displayName} at {monname}");
+                                    UnityEngine.Object.Destroy(bot);
+                                }
+                            }
+
+                            spawnpoints.Remove(monname);
+                            SaveData();
+                            NPCProfileSelectGUI(player);
+                        }
+                        break;
                     case "respawn":
                         {
                             List<string> newarg = new List<string>(args);
@@ -419,6 +446,34 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "addprofile":
+                        {
+                            NPCNewProfileGUI(player);
+                        }
+                        break;
+                    case "newprofile":
+                        {
+                            CuiHelper.DestroyUi(player, NPCGUP);
+                            spawnpoints.Add(args[1], new SpawnPoints()
+                            {
+                                monname = args[1],
+                                monpos = player.transform.position,
+                                respawn = true,
+                                respawnTime = configData.Options.respawnTimer,
+                                startHealth = configData.Options.defaultHealth,
+                                lootable = true,
+                                hostile = false,
+                                invulnerable = false,
+                                dropWeapon = false,
+                                spawnCount = 0,
+                                spawnRange = 30,
+                                detectRange = 60f,
+                                roamRange = 140f
+                            });
+                            SaveData();
+                            NPCProfileEditGUI(player, args[1]);
+                        }
+                        break;
                     case "monsel":
                         if (args.Length > 1)
                         {
@@ -428,6 +483,13 @@ namespace Oxide.Plugins
                             string monname = string.Join(" ", newarg);
                             NPCProfileEditGUI(player, monname);
                         }
+                        break;
+                    case "newprofileclose":
+                        CuiHelper.DestroyUi(player, NPCGUP);
+                        break;
+                    case "newprofilecancel":
+                        CuiHelper.DestroyUi(player, NPCGUP);
+                        NPCProfileSelectGUI(player);
                         break;
                     case "namesclose":
                         CuiHelper.DestroyUi(player, NPCGUN);
@@ -452,10 +514,61 @@ namespace Oxide.Plugins
                 {
                     CuiHelper.DestroyUi(player, gui);
                 }
-                NPCMonSelectGUI(player);
+                NPCProfileSelectGUI(player);
             }
         }
         #endregion
+
+        private void NPCProfileSelectGUI(BasePlayer player)
+        {
+            if (player == null) return;
+            CuiHelper.DestroyUi(player, NPCGUM);
+
+            string description = Lang("npcguimon");
+            CuiElementContainer container = UI.Container(NPCGUM, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUM, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUM, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selmonclose");
+
+            int col = 0; int row = 0;
+
+            float[] posb = GetButtonPositionP(row, col);
+            if (monPos.Count > 0)
+            {
+                foreach (string profile in spawnpoints.Keys)
+                {
+                    if (row > 13)
+                    {
+                        row = 0;
+                        col++;
+                    }
+
+                    posb = GetButtonPositionP(row, col);
+                    string color = "#d85540";
+                    if (!monPos.ContainsKey(profile))
+                    {
+                        color = "#5540d8";
+                    }
+                    else if (spawnpoints[profile].spawnCount > 0)
+                    {
+                        color = "#55d840";
+                    }
+                    else if (spawnpoints[profile].names != null && spawnpoints[profile].kits != null)
+                    {
+                        color = "#555555";
+                    }
+
+                    UI.Button(ref container, NPCGUM, UI.Color(color, 1f), profile, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb monsel {profile}");
+
+                    row++;
+                }
+            }
+            // Add
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Button(ref container, NPCGUM, UI.Color("#ff4040", 1f), Lang("addhere"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb addprofile");
+
+            CuiHelper.AddUi(player, container);
+        }
 
         private void NPCProfileEditGUI(BasePlayer player, string profile)
         {
@@ -465,6 +578,10 @@ namespace Oxide.Plugins
             string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
             CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            if (!monPos.ContainsKey(profile))
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
+            }
             UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("respawn"), 12, "0.78 0.95", "0.84 0.98", $"mb respawn {profile}");
             UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
             UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb close");
@@ -606,43 +723,27 @@ namespace Oxide.Plugins
                 UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), kits, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             }
 
+            string footer = Lang("editing") + " " + profile + " " + Lang("at") + " " + sp.monpos.ToString();
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), footer, 12, "0.23 0.02", "0.77 0.06");
+
             CuiHelper.AddUi(player, container);
         }
 
-        private void NPCMonSelectGUI(BasePlayer player)
+        private void NPCNewProfileGUI(BasePlayer player)
         {
-            if (player == null) return;
-            CuiHelper.DestroyUi(player, NPCGUM);
+            CuiHelper.DestroyUi(player, NPCGUP);
 
-            string description = Lang("npcguimon");
-            CuiElementContainer container = UI.Container(NPCGUM, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUM, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            UI.Button(ref container, NPCGUM, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selmonclose");
+            string description = Lang("npcgui");
+            CuiElementContainer container = UI.Container(NPCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("cancel"), 12, "0.86 0.95", "0.91 0.98", "mb newprofilecancel");
+            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb newprofileclose");
 
             int col = 0; int row = 0;
+            float[] posb = GetButtonPositionP(row, col);
 
-            foreach (string moninfo in monPos.Keys)
-            {
-                if (row > 10)
-                {
-                    row = 0;
-                    col++;
-                }
-                float[] posb = GetButtonPositionP(row, col);
-
-                string color = "#d85540";
-                if (spawnpoints[moninfo].spawnCount > 0)
-                {
-                    color = "#55d840";
-                }
-                else if (spawnpoints[moninfo].names != null && spawnpoints[moninfo].kits != null)
-                {
-                    color = "#5540d8";
-                }
-                UI.Button(ref container, NPCGUM, UI.Color(color, 1f), moninfo, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb monsel {moninfo}");
-
-                row++;
-            }
+            UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUP, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb newprofile ");
 
             CuiHelper.AddUi(player, container);
         }
@@ -748,7 +849,8 @@ namespace Oxide.Plugins
         private void SpawnBot(SpawnPoints sp, Vector3 pos, string kit)
         {
             // Used for initial spawn by LoadBots()
-            HumanNPC bot = (HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
+            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
+            global::HumanNPC bot = (global::HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
             bot.Spawn();
 
             NextTick(() =>
@@ -806,7 +908,7 @@ namespace Oxide.Plugins
             }
         }
 
-        private void LoadBots(string monument = "")
+        private void LoadBots(string profile = "")
         {
             DoLog("LoadBots called");
             Dictionary<string, SpawnPoints> newpoints = new Dictionary<string, SpawnPoints>(spawnpoints);
@@ -817,7 +919,7 @@ namespace Oxide.Plugins
                 //    Puts($"Unmatched monument name {sp.Key} in data file");
                 //    continue;
                 //}
-                if (monument.Length > 0 && !sp.Key.Equals(monument)) continue;
+                if (profile.Length > 0 && !sp.Key.Equals(profile)) continue;
 
                 DoLog($"Working on spawn at {sp.Key}");
                 int amount = sp.Value.spawnCount;
@@ -834,11 +936,10 @@ namespace Oxide.Plugins
                         kit = sp.Value.kits[j];
                     }
 
-                    Vector3 pos = monPos[sp.Key];
+                    Vector3 pos = sp.Value.monpos;
                     int spawnRange = sp.Value.spawnRange > 0 ? sp.Value.spawnRange : 15;
                     int x = UnityEngine.Random.Range(-spawnRange, spawnRange);
                     int z = UnityEngine.Random.Range(-spawnRange, spawnRange);
-                    pos.y = TerrainMeta.HeightMap.GetHeight(pos);
                     pos += new Vector3(x, 0, z);
 
                     SpawnBot(sp.Value, pos, kit);
@@ -903,6 +1004,14 @@ namespace Oxide.Plugins
         private void LoadData()
         {
             spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<Dictionary<string, SpawnPoints>>(Name + "/spawnpoints");
+
+            foreach (KeyValuePair<string, SpawnPoints> sp in spawnpoints)
+            {
+                if (monPos.ContainsKey(sp.Key))
+                {
+                    sp.Value.monpos = monPos[sp.Key];
+                }
+            }
         }
 
         private void SaveData()
@@ -1082,12 +1191,6 @@ namespace Oxide.Plugins
                 case "kit":
                     hp.info.kit = data;
                     break;
-                case "entrypause":
-                    hp.info.entrypause = !GetBoolValue(data);
-                    break;
-                case "entrypausetime":
-                    hp.info.entrypausetime = Convert.ToSingle(data);
-                    break;
                 case "health":
                     hp.info.health = Convert.ToSingle(data);
                     hp.UpdateHealth(hp.info);
@@ -1128,9 +1231,6 @@ namespace Oxide.Plugins
                 case "respawntimer":
                     hp.info.respawnTimer = Convert.ToSingle(data);
                     break;
-                case "attackdistance":
-                    hp.info.attackDistance = Convert.ToSingle(data);
-                    break;
                 case "maxdistance":
                     hp.info.maxDistance = Convert.ToSingle(data);
                     break;
@@ -1153,7 +1253,7 @@ namespace Oxide.Plugins
             //RespawnNPC(hp.player);
         }
 
-        private void GiveMonBot(HumanNPC bot, string itemname, string loc = "wear", ulong skinid = 0, int count = 1)
+        private void GiveMonBot(global::HumanNPC bot, string itemname, string loc = "wear", ulong skinid = 0, int count = 1)
         {
             DoLog($"GiveMonBot called: {bot.displayName}, {itemname}, {loc}");
             MonBotPlayer npc = bot.GetComponent<MonBotPlayer>();
@@ -1329,6 +1429,7 @@ namespace Oxide.Plugins
         public class SpawnPoints
         {
             public string monname;
+            public Vector3 monpos;
             public int spawnCount;
             public int spawnRange;
             public float respawnTime;
@@ -1383,13 +1484,8 @@ namespace Oxide.Plugins
             public Vector3 targetloc;
             public float health;
             public float maxDistance;
-            public float attackDistance;
             public float damageDistance;
             public float damageAmount;
-            public float followTime;
-            public float entrypausetime;
-            public string waypoint;
-            public bool holdingWeapon;
 
             public MonBotInfo(ulong uid, Vector3 position, Quaternion rotation)
             {
@@ -1423,13 +1519,13 @@ namespace Oxide.Plugins
         {
             public MonBotInfo info;
             public ProtectionProperties protection;
-            public HumanNPC player;
+            public global::HumanNPC player;
 
             public Vector3 spawnPos;
 
             private void Start()
             {
-                player = GetComponent<HumanNPC>();
+                player = GetComponent<global::HumanNPC>();
                 //protection = ScriptableObject.CreateInstance<ProtectionProperties>();
                 //GestureConfig gestureConfig = ScriptableObject.CreateInstance<GestureConfig>();
                 //gestureConfig.actionType = new GestureConfig.GestureActionType();
@@ -1716,6 +1812,7 @@ namespace Oxide.Plugins
             Vector3 extents = Vector3.zero;
             float realWidth = 0f;
             string name = "";
+            string newname = "";
 
             foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsOfType<MonumentInfo>())
             {
@@ -1745,7 +1842,7 @@ namespace Oxide.Plugins
                 {
                     if (monPos[name] == monument.transform.position) continue;
 
-                    string newname = name.Remove(name.Length -1, 1) + "1";
+                    newname = name.Remove(name.Length -1, 1) + "1";
                     if (monPos.ContainsKey(newname))
                     {
                         newname = name.Remove(name.Length - 1, 1) + "2";
@@ -1778,8 +1875,8 @@ namespace Oxide.Plugins
                     {
                         extents.z = 50f;
                     }
-                    monPos.Add(name, monument.transform.position);
-                    monSize.Add(name, extents);
+                    monPos.Add(name.Trim(), monument.transform.position);
+                    monSize.Add(name.Trim(), extents);
                     //DoLog($"Found monument {name} at {monument.transform.position.ToString()}");
                 }
             }
