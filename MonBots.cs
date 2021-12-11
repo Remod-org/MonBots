@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.4")]
+    [Info("MonBots", "RFC1920", "1.0.5")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -86,51 +86,40 @@ namespace Oxide.Plugins
         {
             lang.RegisterMessages(new Dictionary<string, string>
             {
+                ["add"] = "Add",
+                ["addhere"] = "Add Here",
+                ["at"] = "at",
+                ["cancel"] = "Cancel",
+                ["close"] = "Close",
+                ["delete"] = "DELETE",
+                ["debug"] = "Debug set to {0}",
+                ["detectrange"] = "Detect Range",
+                ["dropweapon"] = "DropWeapon",
+                ["edit"] = "Edit",
+                ["editing"] = "Editing",
+                ["end"] = "End",
+                ["hostile"] = "Hostile",
+                ["invulnerable"] = "Invulnerable",
+                ["kit(s)"] = "Kit(s)",
+                ["lootable"] = "Lootable",
+                ["monbots"] = "MonBots",
+                ["name"] = "Name",
+                ["name(s)"] = "Name(s)",
+                ["needselect"] = "Select NPC",
+                ["new"] = "Create New",
+                ["none"] = "None",
                 ["npcgui"] = "MonBot GUI",
                 ["npcguikit"] = "MonBot GUI Kit Select",
                 ["npcguimon"] = "MonBot GUI Profile Select",
                 ["npcguinames"] = "MonBot GUI Bot Names",
-                ["close"] = "Close",
-                ["at"] = "at",
-                ["none"] = "None",
-                ["start"] = "Start",
-                ["end"] = "End",
-                ["edit"] = "Edit",
-                ["delete"] = "DELETE",
-                ["debug"] = "Debug set to {0}",
-                ["monbots"] = "MonBots",
-                ["needselect"] = "Select NPC",
-                ["select"] = "Select",
+                ["profile"] = "Profile",
                 ["respawn"] = "Respawn",
+                ["respawntime"] = "Respawn Time",
+                ["roamrange"] = "Roam Range",
+                ["select"] = "Select",
                 ["spawncount"] = "Spawn Count",
                 ["spawnrange"] = "Spawn Range",
-                ["respawntime"] = "Respawn Time",
-                ["detectrange"] = "Detect Range",
-                ["roamrange"] = "Roam Range",
-                ["invulnerable"] = "Invulnerable",
-                ["lootable"] = "Lootable",
-                ["dropweapon"] = "DropWeapon",
-                ["name(s)"] = "Name(s)",
-                ["kit(s)"] = "Kit(s)",
-                ["hostile"] = "Hostile",
-                ["profile"] = "Profile",
-                ["editing"] = "Editing",
-                ["mustselect"] = "Please press 'Select' to choose an NPC.",
-                ["guihelp1"] = "For blue buttons, click to toggle true/false.",
-                ["guihelp2"] = "For all values above in gray, you may type a new value and press enter.",
-                ["guihelp3"] = "For kit, press the button to select a kit.",
-                ["cancel"] = "Cancel",
-                ["add"] = "Add",
-                ["addhere"] = "Add Here",
-                ["new"] = "Create New",
-                ["remove"] = "Remove",
-                ["spawnhere"] = "Spawn Here",
-                ["tpto"] = "Teleport to NPC",
-                ["name"] = "Name",
-                ["online"] = "Online",
-                ["offline"] = "Offline",
-                ["deauthall"] = "DeAuthAll",
-                ["remove"] = "Remove"
+                ["start"] = "Start"
             }, this);
         }
 
@@ -565,7 +554,7 @@ namespace Oxide.Plugins
             // Add
             row++;
             posb = GetButtonPositionP(row, col);
-            UI.Button(ref container, NPCGUM, UI.Color("#ff4040", 1f), Lang("addhere"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb addprofile");
+            UI.Button(ref container, NPCGUM, UI.Color("#ff4040", 1f), Lang("addhere"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb addprofile");
 
             CuiHelper.AddUi(player, container);
         }
@@ -739,7 +728,7 @@ namespace Oxide.Plugins
             UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("cancel"), 12, "0.86 0.95", "0.91 0.98", "mb newprofilecancel");
             UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb newprofileclose");
 
-            int col = 0; int row = 0;
+            const int col = 0; const int row = 0;
             float[] posb = GetButtonPositionP(row, col);
 
             UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
@@ -846,19 +835,67 @@ namespace Oxide.Plugins
             }
         }
 
+        private bool BadLocation(Vector3 location)
+        {
+            // Avoid placing in a rock or foundation, water, etc.
+            int layerMask = LayerMask.GetMask("Construction", "World", "Water");
+            RaycastHit hit;
+            if (Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            else if (Physics.Raycast(new Ray(location, Vector3.up), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            else if (Physics.Raycast(new Ray(location, Vector3.forward), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            return false;
+            //return (TerrainMeta.HeightMap.GetHeight(location) - TerrainMeta.WaterMap.GetHeight(location)) >= 0;
+        }
+
+        private Vector3 AdjustSpawnPoint(Vector3 pos, float radius)
+        {
+            Vector3 newpos = new Vector3() { x = pos.x, y = pos.y, z = pos.z };
+            Vector2 rand;
+            bool ok = false;
+            int i = 0;
+
+            while (!ok)
+            {
+                i++;
+                rand = UnityEngine.Random.insideUnitCircle * radius;
+                newpos = pos + new Vector3(rand.x, 0, rand.y);
+                ok = !BadLocation(newpos);
+
+                if (ok || i >= 50)
+                {
+                    newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
+                    return newpos;
+                }
+            }
+            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
+            return pos;
+        }
+
         private void SpawnBot(SpawnPoints sp, Vector3 pos, string kit)
         {
             // Used for initial spawn by LoadBots()
-            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
+            pos = AdjustSpawnPoint(pos, sp.roamRange / 2);
+            DoLog($"Spawning bot at {pos.ToString()}");
             global::HumanNPC bot = (global::HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
             bot.Spawn();
 
             NextTick(() =>
             {
                 string botname = GetBotName(sp.names.ToArray());
-                DoLog($"Spawning bot {botname} at {sp.monname} ({pos.ToString()})");
+                DoLog($"Adding Mono to bot {botname} at {sp.monname} ({pos.ToString()})");
                 MonBotPlayer mono = bot.gameObject.AddComponent<MonBotPlayer>();
                 mono.spawnPos = pos;
+
+                DoLog("Setting info object");
                 mono.info = new MonBotInfo(bot.userID, bot.transform.position, bot.transform.rotation)
                 {
                     displayName = botname,
@@ -880,6 +917,7 @@ namespace Oxide.Plugins
                 //mono.UpdateHealth(mono.info);
                 bot.startHealth = sp.startHealth;
 
+                DoLog("Setting brain object");
                 bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
                 bot.Brain.Navigator.DefaultArea = "Walkable";
                 bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
@@ -891,11 +929,13 @@ namespace Oxide.Plugins
                 bot.Brain.Navigator.MaxRoamDistanceFromHome = mono.info.roamRange;
                 bot.Brain.Senses.Init(bot, 5f, mono.info.roamRange, mono.info.detectRange, -1f, true, false, true, mono.info.detectRange, !mono.info.hostile, false, true, EntityType.Player, false);
 
+                DoLog("Setting name and inventory");
                 bot.displayName = botname;
                 hpcacheid.Add(bot.userID, mono);
                 bot.inventory.Strip();
                 Kits?.Call("GiveKit", bot, kit);
 
+                DoLog("Silencing effects");
                 ScientistNPC npc = bot as ScientistNPC;
                 npc.DeathEffects = new GameObjectRef[0];
                 npc.RadioChatterEffects = new GameObjectRef[0];
