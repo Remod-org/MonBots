@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.5")]
+    [Info("MonBots", "RFC1920", "1.0.6")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -91,8 +91,8 @@ namespace Oxide.Plugins
                 ["at"] = "at",
                 ["cancel"] = "Cancel",
                 ["close"] = "Close",
-                ["delete"] = "DELETE",
                 ["debug"] = "Debug set to {0}",
+                ["delete"] = "DELETE",
                 ["detectrange"] = "Detect Range",
                 ["dropweapon"] = "DropWeapon",
                 ["edit"] = "Edit",
@@ -564,6 +564,8 @@ namespace Oxide.Plugins
             if (player == null) return;
             CuiHelper.DestroyUi(player, NPCGUI);
 
+            if (!spawnpoints.ContainsKey(profile)) return;
+            SpawnPoints sp = spawnpoints[profile];
             string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
             CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
@@ -575,7 +577,6 @@ namespace Oxide.Plugins
             UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
             UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb close");
 
-            SpawnPoints sp = spawnpoints[profile];
             int col = 0;
             int row = 0;
             float[] posb = GetButtonPositionP(row, col);
@@ -835,55 +836,11 @@ namespace Oxide.Plugins
             }
         }
 
-        private bool BadLocation(Vector3 location)
-        {
-            // Avoid placing in a rock or foundation, water, etc.
-            int layerMask = LayerMask.GetMask("Construction", "World", "Water");
-            RaycastHit hit;
-            if (Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask))
-            {
-                return true;
-            }
-            else if (Physics.Raycast(new Ray(location, Vector3.up), out hit, 6f, layerMask))
-            {
-                return true;
-            }
-            else if (Physics.Raycast(new Ray(location, Vector3.forward), out hit, 6f, layerMask))
-            {
-                return true;
-            }
-            return false;
-            //return (TerrainMeta.HeightMap.GetHeight(location) - TerrainMeta.WaterMap.GetHeight(location)) >= 0;
-        }
-
-        private Vector3 AdjustSpawnPoint(Vector3 pos, float radius)
-        {
-            Vector3 newpos = new Vector3() { x = pos.x, y = pos.y, z = pos.z };
-            Vector2 rand;
-            bool ok = false;
-            int i = 0;
-
-            while (!ok)
-            {
-                i++;
-                rand = UnityEngine.Random.insideUnitCircle * radius;
-                newpos = pos + new Vector3(rand.x, 0, rand.y);
-                ok = !BadLocation(newpos);
-
-                if (ok || i >= 50)
-                {
-                    newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
-                    return newpos;
-                }
-            }
-            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
-            return pos;
-        }
-
         private void SpawnBot(SpawnPoints sp, Vector3 pos, string kit)
         {
             // Used for initial spawn by LoadBots()
             pos = AdjustSpawnPoint(pos, sp.roamRange / 2);
+            spawnpoints[sp.monname].pos.Add(pos);
             DoLog($"Spawning bot at {pos.ToString()}");
             global::HumanNPC bot = (global::HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
             bot.Spawn();
@@ -951,8 +908,7 @@ namespace Oxide.Plugins
         private void LoadBots(string profile = "")
         {
             DoLog("LoadBots called");
-            Dictionary<string, SpawnPoints> newpoints = new Dictionary<string, SpawnPoints>(spawnpoints);
-            foreach (KeyValuePair<string, SpawnPoints> sp in spawnpoints)
+            foreach (KeyValuePair<string, SpawnPoints> sp in new Dictionary<string, SpawnPoints>(spawnpoints))
             {
                 //if (!monPos.ContainsKey(sp.Key))
                 //{
@@ -976,18 +932,64 @@ namespace Oxide.Plugins
                         kit = sp.Value.kits[j];
                     }
 
-                    Vector3 pos = sp.Value.monpos;
-                    int spawnRange = sp.Value.spawnRange > 0 ? sp.Value.spawnRange : 15;
-                    int x = UnityEngine.Random.Range(-spawnRange, spawnRange);
-                    int z = UnityEngine.Random.Range(-spawnRange, spawnRange);
-                    pos += new Vector3(x, 0, z);
+                    //Vector3 pos = sp.Value.monpos;
+                    //int spawnRange = sp.Value.spawnRange > 0 ? sp.Value.spawnRange : 15;
+                    //int x = UnityEngine.Random.Range(-spawnRange, spawnRange);
+                    //int z = UnityEngine.Random.Range(-spawnRange, spawnRange);
+                    //pos += new Vector3(x, 0, z);
 
-                    SpawnBot(sp.Value, pos, kit);
+                    //SpawnBot(sp.Value, pos, kit);
+                    SpawnBot(sp.Value, sp.Value.monpos, kit);
 
-                    newpoints[sp.Key].pos.Add(pos);
+                    //newpoints[sp.Key].pos.Add(pos);
                     SaveData();
                 }
             }
+        }
+
+        private bool BadLocation(Vector3 location)
+        {
+            // Avoid placing in a rock or foundation, water, etc.
+            int layerMask = LayerMask.GetMask("Construction", "World", "Water");
+            RaycastHit hit;
+            if (Physics.Raycast(new Ray(location, Vector3.down), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            else if (Physics.Raycast(new Ray(location, Vector3.up), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            else if (Physics.Raycast(new Ray(location, Vector3.forward), out hit, 6f, layerMask))
+            {
+                return true;
+            }
+            return false;
+            //return (TerrainMeta.HeightMap.GetHeight(location) - TerrainMeta.WaterMap.GetHeight(location)) >= 0;
+        }
+
+        private Vector3 AdjustSpawnPoint(Vector3 pos, float radius)
+        {
+            Vector3 newpos = new Vector3() { x = pos.x, y = pos.y, z = pos.z };
+            Vector2 rand;
+            bool ok = false;
+            int i = 0;
+
+            while (!ok)
+            {
+                i++;
+                rand = UnityEngine.Random.insideUnitCircle * radius;
+                newpos = pos + new Vector3(rand.x, 0, rand.y);
+                ok = !BadLocation(newpos);
+
+                if (ok || i >= 50)
+                {
+                    newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
+                    return newpos;
+                }
+            }
+            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
+            return pos;
         }
 
         private string GetBotName(string[] names)
@@ -1079,21 +1081,15 @@ namespace Oxide.Plugins
             }
         }
 
-        private void OnEntityDeath(BaseCombatEntity entity, HitInfo hitinfo)
+        private void OnEntityKill(global::HumanNPC npc)//, HitInfo hitinfo)
         {
-            if (entity == null) return;
-
-            global::HumanNPC npc = entity as global::HumanNPC;
             if (npc == null) return;
 
             MonBotPlayer hp = npc.GetComponent<MonBotPlayer>();
             if (hp == null) return;
+            DoLog("OnEntityDeath: Found MonBot player");
 
-            if (!hp.info.lootable)
-            {
-                npc.inventory?.Strip();
-            }
-            else if (hp.info.dropWeapon)
+            if (hp.info.dropWeapon)
             {
                 Item activeItem = npc.GetActiveItem();
                 if (activeItem != null)
@@ -1101,9 +1097,16 @@ namespace Oxide.Plugins
                     DoLog($"Dropping {hp.info.displayName}'s activeItem: {activeItem.info.shortname}");
                     activeItem.Drop(npc.eyes.position, new Vector3(), new Quaternion());
                     npc.svActiveItemID = 0;
-                    npc.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
                 }
             }
+
+            DoLog("Checking NPC lootable flag");
+            if (!hp.info.lootable)
+            {
+                DoLog($"Not lootable - stripping {npc.displayName} inventory");
+                npc.inventory?.Strip();
+            }
+            npc.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
 
             DoLog("Checking respawn variable");
             if (hp?.info.respawn == true)
