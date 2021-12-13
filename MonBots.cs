@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.6")]
+    [Info("MonBots", "RFC1920", "1.0.7")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -66,7 +66,7 @@ namespace Oxide.Plugins
         private static SortedDictionary<string, Vector3> cavePos = new SortedDictionary<string, Vector3>();
 
         private readonly static int playerMask = LayerMask.GetMask("Player (Server)");
-        #endregion
+        #endregion vars
 
         #region Message
         private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
@@ -79,7 +79,7 @@ namespace Oxide.Plugins
                 Interface.Oxide.LogInfo(message);
             }
         }
-        #endregion
+        #endregion Message
 
         #region global
         protected override void LoadDefaultMessages()
@@ -183,7 +183,7 @@ namespace Oxide.Plugins
                 corpse._playerName = npc.info.displayName;
                 corpse.lootPanelName = npc.info.displayName;
 
-                DoLog("Checking lootable flag");
+                DoLog("Checking corpse lootable flag");
                 if (!npc.info.lootable)
                 {
                     for (int i = 0; i < corpse.containers.Length; i++)
@@ -327,10 +327,6 @@ namespace Oxide.Plugins
                         }
                         break;
                     case "name":
-                        //  0     1                  LAST
-                        //name,Pancetta,Airfield,0,DELETE_ME  - Delete existing name
-                        //name,Pancetta,Airfield,0,qwe        - Rename
-                        //name,NEW_NAME,Airfield,0,new        - Create new name
                         {
                             List<string> newarg = new List<string>(args);
                             newarg.RemoveAt(0);
@@ -506,7 +502,7 @@ namespace Oxide.Plugins
                 NPCProfileSelectGUI(player);
             }
         }
-        #endregion
+        #endregion commands
 
         private void NPCProfileSelectGUI(BasePlayer player)
         {
@@ -881,8 +877,8 @@ namespace Oxide.Plugins
                 bot.Brain.ForceSetAge(0);
                 bot.Brain.TargetLostRange = mono.info.detectRange;
                 bot.Brain.HostileTargetsOnly = !mono.info.hostile;
-                bot.Brain.Navigator.BestCoverPointMaxDistance = 20f;//0
-                bot.Brain.Navigator.BestRoamPointMaxDistance = mono.info.roamRange;//0
+                bot.Brain.Navigator.BestCoverPointMaxDistance = mono.info.roamRange/2;
+                bot.Brain.Navigator.BestRoamPointMaxDistance = mono.info.roamRange;
                 bot.Brain.Navigator.MaxRoamDistanceFromHome = mono.info.roamRange;
                 bot.Brain.Senses.Init(bot, 5f, mono.info.roamRange, mono.info.detectRange, -1f, true, false, true, mono.info.detectRange, !mono.info.hostile, false, true, EntityType.Player, false);
 
@@ -897,6 +893,8 @@ namespace Oxide.Plugins
                 npc.DeathEffects = new GameObjectRef[0];
                 npc.RadioChatterEffects = new GameObjectRef[0];
                 npc.radioChatterType = ScientistNPC.RadioChatterType.NONE;
+
+                timer.Once(5f, () => mono.activeItem = bot.GetActiveItem());
             });
 
             if (bot.IsHeadUnderwater())
@@ -910,11 +908,6 @@ namespace Oxide.Plugins
             DoLog("LoadBots called");
             foreach (KeyValuePair<string, SpawnPoints> sp in new Dictionary<string, SpawnPoints>(spawnpoints))
             {
-                //if (!monPos.ContainsKey(sp.Key))
-                //{
-                //    Puts($"Unmatched monument name {sp.Key} in data file");
-                //    continue;
-                //}
                 if (profile.Length > 0 && !sp.Key.Equals(profile)) continue;
 
                 DoLog($"Working on spawn at {sp.Key}");
@@ -974,6 +967,7 @@ namespace Oxide.Plugins
             Vector2 rand;
             bool ok = false;
             int i = 0;
+            const int max = 250;
 
             while (!ok)
             {
@@ -982,9 +976,17 @@ namespace Oxide.Plugins
                 newpos = pos + new Vector3(rand.x, 0, rand.y);
                 ok = !BadLocation(newpos);
 
-                if (ok || i >= 50)
+                if (ok || i >= max)
                 {
                     newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
+                    if (i >= max)
+                    {
+                        DoLog($"Found meh spawn position after maxing out on checks at {max.ToString()}");
+                    }
+                    else
+                    {
+                        DoLog($"Found adequate spawn position after {i.ToString()} check(s)");
+                    }
                     return newpos;
                 }
             }
@@ -1060,7 +1062,7 @@ namespace Oxide.Plugins
         {
             Interface.Oxide.DataFileSystem.WriteObject(Name + "/spawnpoints", spawnpoints);
         }
-        #endregion
+        #endregion global
 
         #region Oxide Hooks
         private void OnPlayerInput(BasePlayer player, InputState input)
@@ -1081,32 +1083,24 @@ namespace Oxide.Plugins
             }
         }
 
-        private void OnEntityKill(global::HumanNPC npc)//, HitInfo hitinfo)
+        private void OnEntityDeath(global::HumanNPC npc, HitInfo hitinfo)
         {
             if (npc == null) return;
-
             MonBotPlayer hp = npc.GetComponent<MonBotPlayer>();
             if (hp == null) return;
             DoLog("OnEntityDeath: Found MonBot player");
 
             if (hp.info.dropWeapon)
             {
-                Item activeItem = npc.GetActiveItem();
-                if (activeItem != null)
+                DoLog("OnEntityDeath: Attempting to drop weapon");
+                if (hp.activeItem != null)
                 {
-                    DoLog($"Dropping {hp.info.displayName}'s activeItem: {activeItem.info.shortname}");
-                    activeItem.Drop(npc.eyes.position, new Vector3(), new Quaternion());
+                    DoLog($"Dropping {hp.info.displayName}'s activeItem: {hp.activeItem.info.shortname}");
+                    Vector3 vector3 = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.2f, UnityEngine.Random.Range(-2f, 2f));
+                    hp.activeItem.Drop(npc.GetDropPosition(), npc.GetInheritedDropVelocity() + (vector3.normalized * 3f));
                     npc.svActiveItemID = 0;
                 }
             }
-
-            DoLog("Checking NPC lootable flag");
-            if (!hp.info.lootable)
-            {
-                DoLog($"Not lootable - stripping {npc.displayName} inventory");
-                npc.inventory?.Strip();
-            }
-            npc.SendNetworkUpdate(BasePlayer.NetworkQueue.Update);
 
             DoLog("Checking respawn variable");
             if (hp?.info.respawn == true)
@@ -1202,7 +1196,7 @@ namespace Oxide.Plugins
         //        Interface.Oxide.CallHook("OnLootNPC", looter.inventory.loot, entity, userId);
         //    }
         //}
-        #endregion
+        #endregion Oxide Hooks
 
         #region Our Inbound Hooks
         private bool IsMonBot(BasePlayer player) => player.GetComponentInParent<MonBotPlayer>() != null;
@@ -1367,7 +1361,7 @@ namespace Oxide.Plugins
                 npc.player.inventory.ServerUpdate(0f);
             }
         }
-        #endregion
+        #endregion Our Inbound Hooks
 
         #region GUI
         // Determine open GUI to limit interruptions
@@ -1386,7 +1380,7 @@ namespace Oxide.Plugins
             DoLog($"Clearing isopen for {uid}");
             isopen.Remove(uid);
         }
-        #endregion
+        #endregion GUI
 
         #region utility
         public static IEnumerable<TValue> RandomValues<TKey, TValue>(IDictionary<TKey, TValue> dict)
@@ -1466,7 +1460,7 @@ namespace Oxide.Plugins
             //}
             //hp.player.inventory.ServerUpdate(0f);
         }
-        #endregion
+        #endregion utility
 
         #region classes
         public class SpawnPoints
@@ -1565,6 +1559,7 @@ namespace Oxide.Plugins
             public global::HumanNPC player;
 
             public Vector3 spawnPos;
+            public Item activeItem;
 
             private void Start()
             {
@@ -1735,7 +1730,7 @@ namespace Oxide.Plugins
                 return $"{(double)red / 255} {(double)green / 255} {(double)blue / 255} {alpha}";
             }
         }
-        #endregion
+        #endregion classes
 
         #region Helpers
         private static bool GetBoolValue(string value)
@@ -1924,7 +1919,7 @@ namespace Oxide.Plugins
                 }
             }
         }
-        #endregion
+        #endregion Helpers
 
         #region config
         protected override void LoadDefaultConfig()
@@ -1972,6 +1967,6 @@ namespace Oxide.Plugins
 
             public bool debug;
         }
-        #endregion
+        #endregion config
     }
 }
