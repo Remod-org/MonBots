@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.7")]
+    [Info("MonBots", "RFC1920", "1.0.8")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -207,6 +207,16 @@ namespace Oxide.Plugins
                 DoLog(string.Join(",", args));
                 switch (args[0])
                 {
+                    // The b version of the commands here are for the GUI, the non-B are left behind for command line people, if any
+                    case "bsc":
+                        {
+                            int intval = int.Parse(args[2]);
+                            string monname = Base64Decode(args[1]);
+                            spawnpoints[monname].spawnCount = intval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "sc":
                         {
                             int intval = int.Parse(args.Last());
@@ -215,6 +225,15 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].spawnCount = intval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "bsr":
+                        {
+                            int intval = int.Parse(args[2]);
+                            string monname = Base64Decode(args[1]);
+                            spawnpoints[monname].spawnRange = intval;
                             SaveData();
                             NPCProfileEditGUI(player, monname);
                         }
@@ -231,6 +250,15 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "brt":
+                        {
+                            int intval = int.Parse(args[2]);
+                            string monname = Base64Decode(args[1]);
+                            spawnpoints[monname].respawnTime = intval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "rt":
                         {
                             int intval = int.Parse(args.Last());
@@ -243,6 +271,15 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "bdr":
+                        {
+                            float fval = float.Parse(args[2]);
+                            string monname = Base64Decode(args[1]);
+                            spawnpoints[monname].detectRange = fval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "dr":
                         {
                             float fval = float.Parse(args.Last());
@@ -251,6 +288,15 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].detectRange = fval;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "brr":
+                        {
+                            float fval = float.Parse(args[2]);
+                            string monname = Base64Decode(args[1]);
+                            spawnpoints[monname].roamRange = fval;
                             SaveData();
                             NPCProfileEditGUI(player, monname);
                         }
@@ -577,6 +623,8 @@ namespace Oxide.Plugins
             int row = 0;
             float[] posb = GetButtonPositionP(row, col);
 
+            string bprofile = Base64Encode(profile);
+
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawncount"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
             posb = GetButtonPositionP(row, col);
@@ -616,33 +664,33 @@ namespace Oxide.Plugins
             col = 1; row = 0;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnCount.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb sc {profile} ");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsc {bprofile} ");
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb sr {profile} ");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsr {bprofile} ");
             row++;
             posb = GetButtonPositionP(row, col);
             if (sp.respawn)
             {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rs {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
             }
             else
             {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rs {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
             }
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.respawnTime.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rt {profile} ");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brt {bprofile} ");
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.detectRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb dr {profile} ");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bdr {bprofile} ");
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.roamRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb rr {profile} ");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brr {bprofile} ");
             row++;
             posb = GetButtonPositionP(row, col);
             if (sp.invulnerable)
@@ -1733,6 +1781,18 @@ namespace Oxide.Plugins
         #endregion classes
 
         #region Helpers
+        public static string Base64Encode(string plainText)
+        {
+            var plainTextBytes = System.Text.Encoding.UTF8.GetBytes(plainText);
+            return Convert.ToBase64String(plainTextBytes);
+        }
+
+        public static string Base64Decode(string base64EncodedData)
+        {
+            var base64EncodedBytes = Convert.FromBase64String(base64EncodedData);
+            return System.Text.Encoding.UTF8.GetString(base64EncodedBytes);
+        }
+
         private static bool GetBoolValue(string value)
         {
             if (value == null)
