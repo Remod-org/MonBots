@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.8")]
+    [Info("MonBots", "RFC1920", "1.0.9")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -1247,7 +1247,7 @@ namespace Oxide.Plugins
         #endregion Oxide Hooks
 
         #region Our Inbound Hooks
-        private bool IsMonBot(BasePlayer player) => player.GetComponentInParent<MonBotPlayer>() != null;
+        private bool IsMonBot(ScientistNPC player) => player.GetComponentInParent<MonBotPlayer>() != null;
 
         private string GetMonBotName(ulong npcid)
         {
