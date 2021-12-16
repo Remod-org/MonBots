@@ -1053,10 +1053,8 @@ namespace Oxide.Plugins
 
         private string GetBotName(string[] names)
         {
-            Puts("GetBotName called");
             if (names.Length == 1)
             {
-                Puts("Got here!");
                 return names[0];
             }
             else if (names.Length > 1)
