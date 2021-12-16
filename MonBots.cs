@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.9")]
+    [Info("MonBots", "RFC1920", "1.0.10")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -889,9 +889,14 @@ namespace Oxide.Plugins
             global::HumanNPC bot = (global::HumanNPC)GameManager.server.CreateEntity(sci, pos, new Quaternion(), true);
             bot.Spawn();
 
+            string botname = "Bot";
+            if (sp.names != null)
+            {
+                botname = GetBotName(sp.names.ToArray());
+            }
+
             NextTick(() =>
             {
-                string botname = GetBotName(sp.names.ToArray());
                 DoLog($"Adding Mono to bot {botname} at {sp.monname} ({pos.ToString()})");
                 MonBotPlayer mono = bot.gameObject.AddComponent<MonBotPlayer>();
                 mono.spawnPos = pos;
@@ -963,7 +968,11 @@ namespace Oxide.Plugins
                 string kit = "";
                 for (int i = 0; i < amount; i++)
                 {
-                    if (sp.Value.kits.Count == 1)
+                    if (sp.Value.kits == null)
+                    {
+                        kit = "";
+                    }
+                    else if (sp.Value.kits.Count == 1)
                     {
                         kit = sp.Value.kits.FirstOrDefault();
                     }
@@ -1044,8 +1053,10 @@ namespace Oxide.Plugins
 
         private string GetBotName(string[] names)
         {
+            Puts("GetBotName called");
             if (names.Length == 1)
             {
+                Puts("Got here!");
                 return names[0];
             }
             else if (names.Length > 1)
