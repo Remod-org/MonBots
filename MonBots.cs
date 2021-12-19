@@ -20,6 +20,7 @@
     Optionally you can also view the license at <http://www.gnu.org/licenses/>.
 */
 #endregion License (GPL v3)
+using Facepunch;
 using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
@@ -35,7 +36,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.11")]
+    [Info("MonBots", "RFC1920", "1.0.12")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -98,11 +99,13 @@ namespace Oxide.Plugins
                 ["edit"] = "Edit",
                 ["editing"] = "Editing",
                 ["end"] = "End",
+                ["gotospawn"] = "Go There",
                 ["hostile"] = "Hostile",
                 ["invulnerable"] = "Invulnerable",
                 ["kit(s)"] = "Kit(s)",
                 ["lootable"] = "Lootable",
                 ["monbots"] = "MonBots",
+                ["movehere"] = "Move Here",
                 ["name"] = "Name",
                 ["name(s)"] = "Name(s)",
                 ["needselect"] = "Select NPC",
@@ -424,6 +427,25 @@ namespace Oxide.Plugins
                             NPCProfileSelectGUI(player);
                         }
                         break;
+                    case "gothere":
+                        {
+                            CuiHelper.DestroyUi(player, NPCGUI);
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            Teleport(player, spawnpoints[monname].monpos);
+                        }
+                        break;
+                    case "spawnhere":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].monpos = player.transform.position;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "respawn":
                         {
                             List<string> newarg = new List<string>(args);
@@ -499,7 +521,9 @@ namespace Oxide.Plugins
                                 spawnCount = 0,
                                 spawnRange = 30,
                                 detectRange = 60f,
-                                roamRange = 140f
+                                roamRange = 140f,
+                                names = new List<string>(),
+                                pos = new List<Vector3>()
                             });
                             SaveData();
                             NPCProfileEditGUI(player, args[1]);
@@ -614,6 +638,8 @@ namespace Oxide.Plugins
             if (!monPos.ContainsKey(profile))
             {
                 UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#4055d8", 1f), Lang("movehere"), 12, "0.78 0.02", "0.84 0.06", $"mb spawnhere {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#40d855", 1f), Lang("gotospawn"), 12, "0.85 0.02", "0.91 0.06", $"mb gothere {profile}");
             }
             UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("respawn"), 12, "0.78 0.95", "0.84 0.98", $"mb respawn {profile}");
             UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
@@ -938,8 +964,11 @@ namespace Oxide.Plugins
                 DoLog("Setting name and inventory");
                 bot.displayName = botname;
                 hpcacheid.Add(bot.userID, mono);
-                bot.inventory.Strip();
-                Kits?.Call("GiveKit", bot, kit);
+                if (kit.Length > 0)
+                {
+                    bot.inventory.Strip();
+                    Kits?.Call("GiveKit", bot, kit);
+                }
 
                 DoLog("Silencing effects");
                 ScientistNPC npc = bot as ScientistNPC;
@@ -1044,6 +1073,7 @@ namespace Oxide.Plugins
                     {
                         DoLog($"Found adequate spawn position after {i.ToString()} check(s)");
                     }
+                    newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
                     return newpos;
                 }
             }
@@ -1614,17 +1644,85 @@ namespace Oxide.Plugins
             public MonBotInfo info;
             public ProtectionProperties protection;
             public global::HumanNPC player;
+            public BaseMelee melee;
 
             public Vector3 spawnPos;
             public Item activeItem;
 
+            public bool inmelee;
+            public float oldDamageScale;
+            public float oldEffectiveRange;
+            public float oldStoppingDistance;
+
+            public float triggerDelay;
+            public bool canHurt = true;
+
             private void Start()
             {
                 player = GetComponent<global::HumanNPC>();
-                //protection = ScriptableObject.CreateInstance<ProtectionProperties>();
-                //GestureConfig gestureConfig = ScriptableObject.CreateInstance<GestureConfig>();
-                //gestureConfig.actionType = new GestureConfig.GestureActionType();
+                melee = GetComponent<BaseMelee>();
                 InvokeRepeating("GoHome", 1f, 1f);
+            }
+
+            private void FixedUpdate()
+            {
+                AttackEntity ent = player.GetAttackEntity();
+                if (ent == null) return;
+                BaseProjectile weapon = ent as BaseProjectile;
+                melee = ent as BaseMelee;
+
+                if (weapon == null && !inmelee)
+                {
+                    if (melee == null) return;
+                    if (!IsInvoking("DoTriggerDown"))
+                    {
+                        triggerDelay = melee?.aiStrikeDelay ?? 0.2f;
+                        InvokeRepeating("DoTriggerDown", 0, 1f);
+                        inmelee = true;
+                    }
+                }
+                else if (weapon != null)
+                {
+                    inmelee = false;
+                    CancelInvoke("DoTriggerDown");
+                    player.Brain.states[AIState.Roam].StateEnter();
+                }
+            }
+
+            private void DoTriggerDown()
+            {
+                BasePlayer attackPlayer = player.Brain.Senses.Players.FirstOrDefault()?.ToPlayer();
+
+                if (attackPlayer != null)
+                {
+                    player.Brain.Navigator.SetDestination(attackPlayer.transform.position, BaseNavigator.NavigationSpeed.Fast, 0f, 0f);
+
+                    if (Vector3.Distance(player.transform.position, attackPlayer.transform.position) <= melee.maxDistance)
+                    {
+                        if (canHurt)
+                        {
+                            Instance.DoLog($"TriggerDown on {attackPlayer.displayName}");
+                            //player.TriggerDown();
+                            melee.ServerUse(player.damageScale, null);
+
+                            Instance.timer.Once(triggerDelay, () =>
+                            {
+                                Instance.DoLog($"Trigger delay: {triggerDelay.ToString()}");
+                                attackPlayer.Hurt(melee.TotalDamage(), DamageType.Slash, player, true);
+                                Effect.server.Run("assets/bundled/prefabs/fx/headshot.prefab", attackPlayer.transform.position);
+                                canHurt = false;
+                                Invoke("ResetCanHurt", 0.5f);
+                            });
+                        }
+                    }
+                    return;
+                }
+                ResetCanHurt();
+            }
+
+            private void ResetCanHurt()
+            {
+                canHurt = true;
             }
 
             private void GoHome()
