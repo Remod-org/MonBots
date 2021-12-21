@@ -36,7 +36,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.12")]
+    [Info("MonBots", "RFC1920", "1.0.13")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -49,11 +49,11 @@ namespace Oxide.Plugins
         private List<ulong> isopen = new List<ulong>();
 
         private const string permNPCGuiUse = "monbot.use";
-        private const string NPCGUI = "npc.editor";
-        private const string NPCGUK = "npc.kitselect";
-        private const string NPCGUM = "npc.monselect";
-        private const string NPCGUN = "npc.kitsetnames";
-        private const string NPCGUP = "npc.newprofile";
+        private const string NPCGUI = "monbot.editor";
+        private const string NPCGUK = "monbot.kitselect";
+        private const string NPCGUM = "monbot.monselect";
+        private const string NPCGUN = "monbot.kitsetnames";
+        private const string NPCGUP = "monbot.newprofile";
         private readonly List<string> guis = new List<string>() { NPCGUI, NPCGUK, NPCGUM, NPCGUN, NPCGUP };
 
         private bool newsave;
@@ -386,7 +386,7 @@ namespace Oxide.Plugins
                             string botname = args[1];
                             string newname = args.Last();
 
-                            if (sp.names == null || sp.kits.Count == 0)
+                            if (sp.names == null || sp.names.Count == 0)
                             {
                                 sp.names = new List<string>();
                             }
