@@ -36,7 +36,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.13")]
+    [Info("MonBots", "RFC1920", "1.0.14")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -213,11 +213,14 @@ namespace Oxide.Plugins
                     // The b version of the commands here are for the GUI, the non-B are left behind for command line people, if any
                     case "bsc":
                         {
-                            int intval = int.Parse(args[2]);
-                            string monname = Base64Decode(args[1]);
-                            spawnpoints[monname].spawnCount = intval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            if (args.Length > 2)
+                            {
+                                int intval = int.Parse(args[2]);
+                                string monname = Base64Decode(args[1]);
+                                spawnpoints[monname].spawnCount = intval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
                         }
                         break;
                     case "sc":
@@ -234,11 +237,14 @@ namespace Oxide.Plugins
                         break;
                     case "bsr":
                         {
-                            int intval = int.Parse(args[2]);
-                            string monname = Base64Decode(args[1]);
-                            spawnpoints[monname].spawnRange = intval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            if (args.Length > 2)
+                            {
+                                int intval = int.Parse(args[2]);
+                                string monname = Base64Decode(args[1]);
+                                spawnpoints[monname].spawnRange = intval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
                         }
                         break;
                     case "sr":
@@ -255,11 +261,14 @@ namespace Oxide.Plugins
                         break;
                     case "brt":
                         {
-                            int intval = int.Parse(args[2]);
-                            string monname = Base64Decode(args[1]);
-                            spawnpoints[monname].respawnTime = intval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            if (args.Length > 2)
+                            {
+                                int intval = int.Parse(args[2]);
+                                string monname = Base64Decode(args[1]);
+                                spawnpoints[monname].respawnTime = intval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
                         }
                         break;
                     case "rt":
@@ -276,11 +285,14 @@ namespace Oxide.Plugins
                         break;
                     case "bdr":
                         {
-                            float fval = float.Parse(args[2]);
-                            string monname = Base64Decode(args[1]);
-                            spawnpoints[monname].detectRange = fval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            if (args.Length > 2)
+                            {
+                                float fval = float.Parse(args[2]);
+                                string monname = Base64Decode(args[1]);
+                                spawnpoints[monname].detectRange = fval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
                         }
                         break;
                     case "dr":
@@ -297,11 +309,14 @@ namespace Oxide.Plugins
                         break;
                     case "brr":
                         {
-                            float fval = float.Parse(args[2]);
-                            string monname = Base64Decode(args[1]);
-                            spawnpoints[monname].roamRange = fval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            if (args.Length > 2)
+                            {
+                                float fval = float.Parse(args[2]);
+                                string monname = Base64Decode(args[1]);
+                                spawnpoints[monname].roamRange = fval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
                         }
                         break;
                     case "rr":
