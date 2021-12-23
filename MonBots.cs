@@ -20,7 +20,6 @@
     Optionally you can also view the license at <http://www.gnu.org/licenses/>.
 */
 #endregion License (GPL v3)
-using Facepunch;
 using Newtonsoft.Json;
 using Oxide.Core;
 using Oxide.Core.Libraries.Covalence;
@@ -36,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.14")]
+    [Info("MonBots", "RFC1920", "1.0.15")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -173,6 +172,43 @@ namespace Oxide.Plugins
                     isopen.Remove(player.userID);
                 }
             }
+        }
+
+        private void OnNewSave()
+        {
+            newsave = true;
+        }
+
+        private void Unload()
+        {
+            foreach (BasePlayer player in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
+            {
+                foreach (string gui in guis)
+                {
+                    CuiHelper.DestroyUi(player, gui);
+                }
+
+                if (isopen.Contains(player.userID))
+                {
+                    isopen.Remove(player.userID);
+                }
+            }
+
+            MonBotPlayer[] bots = UnityEngine.Object.FindObjectsOfType<MonBotPlayer>();
+            if (bots != null)
+            {
+                foreach (MonBotPlayer bot in bots)
+                {
+                    //UnityEngine.Object.Destroy(bot.player);
+                    UnityEngine.Object.Destroy(bot);
+                }
+            }
+
+            foreach (KeyValuePair<string, SpawnPoints> x in new Dictionary<string, SpawnPoints>(spawnpoints))
+            {
+                x.Value.pos = new List<Vector3>();
+            }
+            SaveData();
         }
 
         private void OnEntitySpawned(NPCPlayerCorpse corpse)
@@ -589,321 +625,6 @@ namespace Oxide.Plugins
         }
         #endregion commands
 
-        private void NPCProfileSelectGUI(BasePlayer player)
-        {
-            if (player == null) return;
-            CuiHelper.DestroyUi(player, NPCGUM);
-
-            string description = Lang("npcguimon");
-            CuiElementContainer container = UI.Container(NPCGUM, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUM, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            UI.Button(ref container, NPCGUM, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selmonclose");
-
-            int col = 0; int row = 0;
-
-            float[] posb = GetButtonPositionP(row, col);
-            if (monPos.Count > 0)
-            {
-                foreach (string profile in spawnpoints.Keys)
-                {
-                    if (row > 13)
-                    {
-                        row = 0;
-                        col++;
-                    }
-
-                    posb = GetButtonPositionP(row, col);
-                    string color = "#d85540";
-                    if (!monPos.ContainsKey(profile))
-                    {
-                        color = "#5540d8";
-                    }
-                    else if (spawnpoints[profile].spawnCount > 0)
-                    {
-                        color = "#55d840";
-                    }
-                    else if (spawnpoints[profile].names != null && spawnpoints[profile].kits != null)
-                    {
-                        color = "#555555";
-                    }
-
-                    UI.Button(ref container, NPCGUM, UI.Color(color, 1f), profile, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb monsel {profile}");
-
-                    row++;
-                }
-            }
-            // Add
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Button(ref container, NPCGUM, UI.Color("#ff4040", 1f), Lang("addhere"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb addprofile");
-
-            CuiHelper.AddUi(player, container);
-        }
-
-        private void NPCProfileEditGUI(BasePlayer player, string profile)
-        {
-            if (player == null) return;
-            CuiHelper.DestroyUi(player, NPCGUI);
-
-            if (!spawnpoints.ContainsKey(profile)) return;
-            SpawnPoints sp = spawnpoints[profile];
-            string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
-            CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            if (!monPos.ContainsKey(profile))
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
-                UI.Button(ref container, NPCGUI, UI.Color("#4055d8", 1f), Lang("movehere"), 12, "0.78 0.02", "0.84 0.06", $"mb spawnhere {profile}");
-                UI.Button(ref container, NPCGUI, UI.Color("#40d855", 1f), Lang("gotospawn"), 12, "0.85 0.02", "0.91 0.06", $"mb gothere {profile}");
-            }
-            UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("respawn"), 12, "0.78 0.95", "0.84 0.98", $"mb respawn {profile}");
-            UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
-            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb close");
-
-            int col = 0;
-            int row = 0;
-            float[] posb = GetButtonPositionP(row, col);
-
-            string bprofile = Base64Encode(profile);
-
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawncount"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawnrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawn"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawntime"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("detectrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("roamrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("invulnerable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("lootable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("dropweapon"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("hostile"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-
-            col = 3; row = 0;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("name(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("kit(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-
-            col = 1; row = 0;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnCount.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsc {bprofile} ");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsr {bprofile} ");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.respawn)
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
-            }
-            else
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
-            }
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.respawnTime.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brt {bprofile} ");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.detectRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bdr {bprofile} ");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.roamRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brr {bprofile} ");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.invulnerable)
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.invulnerable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb inv {profile}");
-            }
-            else
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.invulnerable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb inv {profile}");
-            }
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.lootable)
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
-            }
-            else
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
-            }
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.dropWeapon)
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.dropWeapon.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb drop {profile}");
-            }
-            else
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.dropWeapon.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb drop {profile}");
-            }
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.hostile)
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.hostile.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb hostile {profile}");
-            }
-            else
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.hostile.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb hostile {profile}");
-            }
-
-            col = 4;
-            row = 0;
-
-            posb = GetButtonPositionP(row, col);
-            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("edit"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb names {profile}");
-            row++;
-            posb = GetButtonPositionP(row, col);
-            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("edit"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb selkit {profile}");
-
-            col++; row = 0;
-            posb = GetButtonPositionP(row, col);
-            if (sp.names != null)
-            {
-                string names = string.Join(" ", sp.names);
-                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), names, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + posb[2] - posb[0]} {posb[3]}");
-            }
-
-            row++;
-            posb = GetButtonPositionP(row, col);
-            if (sp.kits != null)
-            {
-                string kits = string.Join(" ", sp.kits);
-                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), kits, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            }
-
-            string footer = Lang("editing") + " " + profile + " " + Lang("at") + " " + sp.monpos.ToString();
-            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), footer, 12, "0.23 0.02", "0.77 0.06");
-
-            CuiHelper.AddUi(player, container);
-        }
-
-        private void NPCNewProfileGUI(BasePlayer player)
-        {
-            CuiHelper.DestroyUi(player, NPCGUP);
-
-            string description = Lang("npcgui");
-            CuiElementContainer container = UI.Container(NPCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("cancel"), 12, "0.86 0.95", "0.91 0.98", "mb newprofilecancel");
-            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb newprofileclose");
-
-            const int col = 0; const int row = 0;
-            float[] posb = GetButtonPositionP(row, col);
-
-            UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUP, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb newprofile ");
-
-            CuiHelper.AddUi(player, container);
-        }
-
-        private void NPCNamesGUI(BasePlayer player, string profile)
-        {
-            CuiHelper.DestroyUi(player, NPCGUN);
-
-            string description = Lang("npcguinames") + ": " + profile;
-            CuiElementContainer container = UI.Container(NPCGUN, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUN, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            UI.Button(ref container, NPCGUN, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb namesclose");
-
-            SpawnPoints sp = spawnpoints[profile];
-            int col = 0; int row = 0;
-
-            float[] posb = GetButtonPositionP(row, col);
-            if (sp.names != null)
-            {
-                foreach (string nom in sp.names)
-                {
-                    if (row > 10)
-                    {
-                        row = 0;
-                        col++; col++;
-                    }
-                    posb = GetButtonPositionP(row, col);
-
-                    UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), nom, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-                    UI.Input(ref container, NPCGUN, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name {nom} {profile} ");
-                    col++;
-                    posb = GetButtonPositionP(row, col);
-                    UI.Button(ref container, NPCGUN, UI.Color("#ff4040", 1f), Lang("delete"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name {nom} {profile} DELETE_ME");
-                    col--;
-                    row++;
-                }
-
-                row++;
-                posb = GetButtonPositionP(row, col);
-            }
-            UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
-            UI.Input(ref container, NPCGUN, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name NEW_NAME {profile} ");
-
-            CuiHelper.AddUi(player, container);
-        }
-
-        private void NPCKitSelectGUI(BasePlayer player, string profile)
-        {
-            if (player == null) return;
-            CuiHelper.DestroyUi(player, NPCGUK);
-
-            string description = Lang("npcguikit") + ": " + profile;
-            CuiElementContainer container = UI.Container(NPCGUK, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
-            UI.Label(ref container, NPCGUK, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            UI.Button(ref container, NPCGUK, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selkitclose");
-
-            SpawnPoints sp = spawnpoints[profile];
-            int col = 0;
-            int row = 0;
-
-            List<string> kits = new List<string>();
-            Kits?.CallHook("GetKitNames", kits);
-            foreach (string kitinfo in kits)
-            {
-                if (row > 10)
-                {
-                    row = 0;
-                    col++;
-                }
-                float[] posb = GetButtonPositionP(row, col);
-
-                if (sp.kits?.Contains(kitinfo) == true)
-                {
-                    UI.Button(ref container, NPCGUK, UI.Color("#55d840", 1f), kitinfo, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb kitsel {kitinfo} {profile}");
-                }
-                else
-                {
-                    UI.Button(ref container, NPCGUK, UI.Color("#424242", 1f), kitinfo, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb kitsel {kitinfo} {profile}");
-                }
-                row++;
-            }
-
-            CuiHelper.AddUi(player, container);
-        }
-
         private void SpawnBot(ulong userid)
         {
             // Used to identify bot for respawn on death
@@ -924,6 +645,7 @@ namespace Oxide.Plugins
         private void SpawnBot(SpawnPoints sp, Vector3 pos, string kit)
         {
             // Used for initial spawn by LoadBots()
+            if (pos == default(Vector3)) return;
             pos = AdjustSpawnPoint(pos, sp.roamRange / 2);
             spawnpoints[sp.monname].pos.Add(pos);
             DoLog($"Spawning bot at {pos.ToString()}");
@@ -1007,36 +729,40 @@ namespace Oxide.Plugins
             {
                 if (profile.Length > 0 && !sp.Key.Equals(profile)) continue;
 
-                DoLog($"Working on spawn at {sp.Key}");
-                int amount = sp.Value.spawnCount;
-                string kit = "";
-                for (int i = 0; i < amount; i++)
+                Vector3 spawnPos = sp.Value.monpos;
+                if (newsave && monPos.ContainsKey(sp.Key))
                 {
-                    if (sp.Value.kits == null)
-                    {
-                        kit = "";
-                    }
-                    else if (sp.Value.kits.Count == 1)
-                    {
-                        kit = sp.Value.kits.FirstOrDefault();
-                    }
-                    else
-                    {
-                        int j = UnityEngine.Random.Range(0, sp.Value.kits.Count);
-                        kit = sp.Value.kits[j];
-                    }
+                    DoLog($"Changing {sp.Key} location due to wipe to {spawnPos.ToString()}");
+                    spawnPos = monPos[sp.Key];
+                }
+                else if (newsave && !monPos.ContainsKey(sp.Key) && sp.Value.spawnCount > 0)
+                {
+                    Puts($"Server wipe was detected.  Will not spawn bots for profile '{sp.Key}' since it was either custom or the monument does not exist.");
+                    continue;
+                }
 
-                    //Vector3 pos = sp.Value.monpos;
-                    //int spawnRange = sp.Value.spawnRange > 0 ? sp.Value.spawnRange : 15;
-                    //int x = UnityEngine.Random.Range(-spawnRange, spawnRange);
-                    //int z = UnityEngine.Random.Range(-spawnRange, spawnRange);
-                    //pos += new Vector3(x, 0, z);
+                if (sp.Value.spawnCount > 0)
+                {
+                    DoLog($"Working on spawn at {sp.Key}");
+                    string kit = "";
+                    for (int i = 0; i < sp.Value.spawnCount; i++)
+                    {
+                        if (sp.Value.kits == null)
+                        {
+                            kit = "";
+                        }
+                        else if (sp.Value.kits.Count == 1)
+                        {
+                            kit = sp.Value.kits[0];
+                        }
+                        else
+                        {
+                            kit = sp.Value.kits.GetRandom();
+                        }
 
-                    //SpawnBot(sp.Value, pos, kit);
-                    SpawnBot(sp.Value, sp.Value.monpos, kit);
-
-                    //newpoints[sp.Key].pos.Add(pos);
-                    SaveData();
+                        SpawnBot(sp.Value, spawnPos, kit);
+                        SaveData();
+                    }
                 }
             }
         }
@@ -1098,53 +824,15 @@ namespace Oxide.Plugins
 
         private string GetBotName(string[] names)
         {
-            if (names.Length == 1)
+            if (names.Length == 1 && !string.IsNullOrEmpty(names[0]))
             {
                 return names[0];
             }
             else if (names.Length > 1)
             {
-                int index = UnityEngine.Random.Range(0, names.Length);
-                return names[index];
+                return names.GetRandom();
             }
             return "Bot";
-        }
-
-        private void OnNewSave()
-        {
-            newsave = true;
-        }
-
-        private void Unload()
-        {
-            foreach (BasePlayer player in BasePlayer.activePlayerList.Where(x => x.IsAdmin))
-            {
-                foreach (string gui in guis)
-                {
-                    CuiHelper.DestroyUi(player, gui);
-                }
-
-                if (isopen.Contains(player.userID))
-                {
-                    isopen.Remove(player.userID);
-                }
-            }
-
-            MonBotPlayer[] bots = UnityEngine.Object.FindObjectsOfType<MonBotPlayer>();
-            if (bots != null)
-            {
-                foreach (MonBotPlayer bot in bots)
-                {
-                    //UnityEngine.Object.Destroy(bot.player);
-                    UnityEngine.Object.Destroy(bot);
-                }
-            }
-
-            foreach (KeyValuePair<string, SpawnPoints> x in new Dictionary<string, SpawnPoints>(spawnpoints))
-            {
-                x.Value.pos = new List<Vector3>();
-            }
-            SaveData();
         }
 
         private void LoadData()
@@ -1466,6 +1154,321 @@ namespace Oxide.Plugins
         #endregion Our Inbound Hooks
 
         #region GUI
+        private void NPCProfileSelectGUI(BasePlayer player)
+        {
+            if (player == null) return;
+            CuiHelper.DestroyUi(player, NPCGUM);
+
+            string description = Lang("npcguimon");
+            CuiElementContainer container = UI.Container(NPCGUM, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUM, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUM, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selmonclose");
+
+            int col = 0; int row = 0;
+
+            float[] posb = GetButtonPositionP(row, col);
+            if (monPos.Count > 0)
+            {
+                foreach (string profile in spawnpoints.Keys)
+                {
+                    if (row > 13)
+                    {
+                        row = 0;
+                        col++;
+                    }
+
+                    posb = GetButtonPositionP(row, col);
+                    string color = "#d85540";
+                    if (!monPos.ContainsKey(profile))
+                    {
+                        color = "#5540d8";
+                    }
+                    else if (spawnpoints[profile].spawnCount > 0)
+                    {
+                        color = "#55d840";
+                    }
+                    else if (spawnpoints[profile].names != null && spawnpoints[profile].kits != null)
+                    {
+                        color = "#555555";
+                    }
+
+                    UI.Button(ref container, NPCGUM, UI.Color(color, 1f), profile, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb monsel {profile}");
+
+                    row++;
+                }
+            }
+            // Add
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Button(ref container, NPCGUM, UI.Color("#ff4040", 1f), Lang("addhere"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb addprofile");
+
+            CuiHelper.AddUi(player, container);
+        }
+
+        private void NPCProfileEditGUI(BasePlayer player, string profile)
+        {
+            if (player == null) return;
+            CuiHelper.DestroyUi(player, NPCGUI);
+
+            if (!spawnpoints.ContainsKey(profile)) return;
+            SpawnPoints sp = spawnpoints[profile];
+            string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
+            CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            if (!monPos.ContainsKey(profile))
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#4055d8", 1f), Lang("movehere"), 12, "0.78 0.02", "0.84 0.06", $"mb spawnhere {profile}");
+                UI.Button(ref container, NPCGUI, UI.Color("#40d855", 1f), Lang("gotospawn"), 12, "0.85 0.02", "0.91 0.06", $"mb gothere {profile}");
+            }
+            UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("respawn"), 12, "0.78 0.95", "0.84 0.98", $"mb respawn {profile}");
+            UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
+            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb close");
+
+            int col = 0;
+            int row = 0;
+            float[] posb = GetButtonPositionP(row, col);
+
+            string bprofile = Base64Encode(profile);
+
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawncount"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("spawnrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawn"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("respawntime"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("detectrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("roamrange"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("invulnerable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("lootable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("dropweapon"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("hostile"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
+            col = 3; row = 0;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("name(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("kit(s)"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
+            col = 1; row = 0;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnCount.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsc {bprofile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.spawnRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bsr {bprofile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.respawn)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.respawn.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brs {bprofile}");
+            }
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.respawnTime.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brt {bprofile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.detectRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb bdr {bprofile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), sp.roamRange.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUI, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb brr {bprofile} ");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.invulnerable)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.invulnerable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb inv {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.invulnerable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb inv {profile}");
+            }
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.lootable)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
+            }
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.dropWeapon)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.dropWeapon.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb drop {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.dropWeapon.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb drop {profile}");
+            }
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.hostile)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.hostile.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb hostile {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.hostile.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb hostile {profile}");
+            }
+
+            col = 4;
+            row = 0;
+
+            posb = GetButtonPositionP(row, col);
+            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("edit"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb names {profile}");
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("edit"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb selkit {profile}");
+
+            col++; row = 0;
+            posb = GetButtonPositionP(row, col);
+            if (sp.names != null)
+            {
+                string names = string.Join(" ", sp.names);
+                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), names, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + posb[2] - posb[0]} {posb[3]}");
+            }
+
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.kits != null)
+            {
+                string kits = string.Join(" ", sp.kits);
+                UI.Label(ref container, NPCGUI, UI.Color("#535353", 1f), kits, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            }
+
+            string footer = Lang("editing") + " " + profile + " " + Lang("at") + " " + sp.monpos.ToString();
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), footer, 12, "0.23 0.02", "0.77 0.06");
+
+            CuiHelper.AddUi(player, container);
+        }
+
+        private void NPCNewProfileGUI(BasePlayer player)
+        {
+            CuiHelper.DestroyUi(player, NPCGUP);
+
+            string description = Lang("npcgui");
+            CuiElementContainer container = UI.Container(NPCGUP, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUP, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("cancel"), 12, "0.86 0.95", "0.91 0.98", "mb newprofilecancel");
+            UI.Button(ref container, NPCGUP, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb newprofileclose");
+
+            const int col = 0; const int row = 0;
+            float[] posb = GetButtonPositionP(row, col);
+
+            UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUP, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb newprofile ");
+
+            CuiHelper.AddUi(player, container);
+        }
+
+        private void NPCNamesGUI(BasePlayer player, string profile)
+        {
+            CuiHelper.DestroyUi(player, NPCGUN);
+
+            string description = Lang("npcguinames") + ": " + profile;
+            CuiElementContainer container = UI.Container(NPCGUN, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUN, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUN, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb namesclose");
+
+            SpawnPoints sp = spawnpoints[profile];
+            int col = 0; int row = 0;
+
+            float[] posb = GetButtonPositionP(row, col);
+            if (sp.names != null)
+            {
+                foreach (string nom in sp.names)
+                {
+                    if (row > 10)
+                    {
+                        row = 0;
+                        col++; col++;
+                    }
+                    posb = GetButtonPositionP(row, col);
+
+                    UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), nom, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+                    UI.Input(ref container, NPCGUN, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name {nom} {profile} ");
+                    col++;
+                    posb = GetButtonPositionP(row, col);
+                    UI.Button(ref container, NPCGUN, UI.Color("#ff4040", 1f), Lang("delete"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name {nom} {profile} DELETE_ME");
+                    col--;
+                    row++;
+                }
+
+                row++;
+                posb = GetButtonPositionP(row, col);
+            }
+            UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Input(ref container, NPCGUN, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name NEW_NAME {profile} ");
+
+            CuiHelper.AddUi(player, container);
+        }
+
+        private void NPCKitSelectGUI(BasePlayer player, string profile)
+        {
+            if (player == null) return;
+            CuiHelper.DestroyUi(player, NPCGUK);
+
+            string description = Lang("npcguikit") + ": " + profile;
+            CuiElementContainer container = UI.Container(NPCGUK, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
+            UI.Label(ref container, NPCGUK, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
+            UI.Button(ref container, NPCGUK, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selkitclose");
+
+            SpawnPoints sp = spawnpoints[profile];
+            int col = 0;
+            int row = 0;
+
+            List<string> kits = new List<string>();
+            Kits?.CallHook("GetKitNames", kits);
+            foreach (string kitinfo in kits)
+            {
+                if (row > 10)
+                {
+                    row = 0;
+                    col++;
+                }
+                float[] posb = GetButtonPositionP(row, col);
+
+                if (sp.kits?.Contains(kitinfo) == true)
+                {
+                    UI.Button(ref container, NPCGUK, UI.Color("#55d840", 1f), kitinfo, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb kitsel {kitinfo} {profile}");
+                }
+                else
+                {
+                    UI.Button(ref container, NPCGUK, UI.Color("#424242", 1f), kitinfo, 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb kitsel {kitinfo} {profile}");
+                }
+                row++;
+            }
+
+            CuiHelper.AddUi(player, container);
+        }
+
         // Determine open GUI to limit interruptions
         private void IsOpen(ulong uid, bool set=false)
         {
@@ -1485,17 +1488,6 @@ namespace Oxide.Plugins
         #endregion GUI
 
         #region utility
-        public static IEnumerable<TValue> RandomValues<TKey, TValue>(IDictionary<TKey, TValue> dict)
-        {
-            System.Random rand = new System.Random();
-            List<TValue> values = dict.Values.ToList();
-            int size = dict.Count;
-            while (true)
-            {
-                yield return values[rand.Next(size)];
-            }
-        }
-
         private MonBotPlayer FindMonBotByID(ulong userid, bool playerid = false)
         {
             MonBotPlayer hp;
