@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.15")]
+    [Info("MonBots", "RFC1920", "1.0.16")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -58,7 +58,7 @@ namespace Oxide.Plugins
         private bool newsave;
 
         public static MonBots Instance;
-        public Dictionary<string, SpawnPoints> spawnpoints = new Dictionary<string, SpawnPoints>();
+        public SortedDictionary<string, SpawnPoints> spawnpoints = new SortedDictionary<string, SpawnPoints>();
         private Dictionary<ulong, MonBotPlayer>  hpcacheid = new Dictionary<ulong, MonBotPlayer>();
 
         private static SortedDictionary<string, Vector3> monPos = new SortedDictionary<string, Vector3>();
@@ -837,10 +837,11 @@ namespace Oxide.Plugins
 
         private void LoadData()
         {
-            spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<Dictionary<string, SpawnPoints>>(Name + "/spawnpoints");
+            spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<SortedDictionary<string, SpawnPoints>>(Name + "/spawnpoints");
 
             foreach (KeyValuePair<string, SpawnPoints> sp in spawnpoints)
             {
+                DoLog($"Loaded profile {sp.Key}");
                 if (monPos.ContainsKey(sp.Key))
                 {
                     sp.Value.monpos = monPos[sp.Key];
@@ -1167,7 +1168,7 @@ namespace Oxide.Plugins
             int col = 0; int row = 0;
 
             float[] posb = GetButtonPositionP(row, col);
-            if (monPos.Count > 0)
+            if (spawnpoints.Count > 0)
             {
                 foreach (string profile in spawnpoints.Keys)
                 {
