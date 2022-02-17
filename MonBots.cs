@@ -35,7 +35,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.16")]
+    [Info("MonBots", "RFC1920", "1.0.17")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -56,14 +56,28 @@ namespace Oxide.Plugins
         private readonly List<string> guis = new List<string>() { NPCGUI, NPCGUK, NPCGUM, NPCGUN, NPCGUP };
 
         private bool newsave;
+        private bool do1017;
 
         public static MonBots Instance;
-        public SortedDictionary<string, SpawnPoints> spawnpoints = new SortedDictionary<string, SpawnPoints>();
+        public SortedDictionary<string, SpawnProfile> spawnpoints = new SortedDictionary<string, SpawnProfile>();
         private Dictionary<ulong, MonBotPlayer>  hpcacheid = new Dictionary<ulong, MonBotPlayer>();
 
         private static SortedDictionary<string, Vector3> monPos = new SortedDictionary<string, Vector3>();
         private static SortedDictionary<string, Vector3> monSize = new SortedDictionary<string, Vector3>();
         private static SortedDictionary<string, Vector3> cavePos = new SortedDictionary<string, Vector3>();
+        private Dictionary<ulong, Inventories> InvCache = new Dictionary<ulong, Inventories>();
+
+        public class Inventories
+        {
+            public List<ItemInfo>[] inventory = { new List<ItemInfo>(), new List<ItemInfo>(), new List<ItemInfo>() };
+        }
+
+        public class ItemInfo
+        {
+            public int ID;
+            public int amount;
+            public ulong skinID;
+        }
 
         private readonly static int playerMask = LayerMask.GetMask("Player (Server)");
         #endregion vars
@@ -103,6 +117,10 @@ namespace Oxide.Plugins
                 ["invulnerable"] = "Invulnerable",
                 ["kit(s)"] = "Kit(s)",
                 ["lootable"] = "Lootable",
+                ["wipeclothing"] = "Wipe clothing",
+                ["wipebelt"] = "Wipe belt",
+                ["wipemain"] = "Wipe main",
+                ["wipecorpsemain"] = "Wipe corpse main",
                 ["monbots"] = "MonBots",
                 ["movehere"] = "Move Here",
                 ["name"] = "Name",
@@ -140,7 +158,7 @@ namespace Oxide.Plugins
             {
                 if (!spawnpoints.ContainsKey(mon.Key))
                 {
-                    spawnpoints.Add(mon.Key, new SpawnPoints()
+                    spawnpoints.Add(mon.Key, new SpawnProfile()
                     {
                         monname = mon.Key,
                         monpos = mon.Value,
@@ -148,6 +166,10 @@ namespace Oxide.Plugins
                         startHealth = 200f,
                         respawn = true,
                         lootable = true,
+                        wipeClothing = true,
+                        wipeBelt = true,
+                        wipeMain = false,
+                        wipeCorpseMain = false,
                         hostile = false,
                         spawnCount = 0,
                         spawnRange = 30,
@@ -199,40 +221,15 @@ namespace Oxide.Plugins
             {
                 foreach (MonBotPlayer bot in bots)
                 {
-                    //UnityEngine.Object.Destroy(bot.player);
                     UnityEngine.Object.Destroy(bot);
                 }
             }
 
-            foreach (KeyValuePair<string, SpawnPoints> x in new Dictionary<string, SpawnPoints>(spawnpoints))
+            foreach (KeyValuePair<string, SpawnProfile> x in new Dictionary<string, SpawnProfile>(spawnpoints))
             {
                 x.Value.pos = new List<Vector3>();
             }
             SaveData();
-        }
-
-        private void OnEntitySpawned(NPCPlayerCorpse corpse)
-        {
-            if (corpse == null) return;
-            ulong userid = corpse?.playerSteamID ?? 0;
-            if (hpcacheid.ContainsKey(userid))
-            {
-                MonBotPlayer npc = hpcacheid[userid];
-                DoLog($"Setting corpse loot panel name to {npc.info.displayName}");
-                corpse._playerName = npc.info.displayName;
-                corpse.lootPanelName = npc.info.displayName;
-
-                DoLog("Checking corpse lootable flag");
-                if (!npc.info.lootable)
-                {
-                    for (int i = 0; i < corpse.containers.Length; i++)
-                    {
-                        DoLog($"Clearing corpse container {i.ToString()}");
-                        corpse.containers[i].Clear();
-                    }
-                    ItemManager.DoRemoves();
-                }
-            }
         }
 
         #region commands
@@ -397,6 +394,46 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "wipec":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].wipeClothing = !spawnpoints[monname].wipeClothing;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "wipeb":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].wipeBelt = !spawnpoints[monname].wipeBelt;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "wipem":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].wipeMain = !spawnpoints[monname].wipeMain;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
+                    case "wipecm":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].wipeCorpseMain = !spawnpoints[monname].wipeCorpseMain;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "drop":
                         {
                             List<string> newarg = new List<string>(args);
@@ -433,7 +470,7 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
-                            SpawnPoints sp = spawnpoints[monname];
+                            SpawnProfile sp = spawnpoints[monname];
                             string botname = args[1];
                             string newname = args.Last();
 
@@ -558,7 +595,7 @@ namespace Oxide.Plugins
                     case "newprofile":
                         {
                             CuiHelper.DestroyUi(player, NPCGUP);
-                            spawnpoints.Add(args[1], new SpawnPoints()
+                            spawnpoints.Add(args[1], new SpawnProfile()
                             {
                                 monname = args[1],
                                 monpos = player.transform.position,
@@ -566,6 +603,10 @@ namespace Oxide.Plugins
                                 respawnTime = configData.Options.respawnTimer,
                                 startHealth = configData.Options.defaultHealth,
                                 lootable = true,
+                                wipeClothing = true,
+                                wipeBelt = true,
+                                wipeMain = false,
+                                wipeCorpseMain = false,
                                 hostile = false,
                                 invulnerable = false,
                                 dropWeapon = false,
@@ -632,7 +673,7 @@ namespace Oxide.Plugins
             {
                 DoLog($"{userid.ToString()} found in cached ids!");
                 MonBotPlayer botinfo = hpcacheid[userid];
-                SpawnPoints sp = spawnpoints[botinfo.info.monument];
+                SpawnProfile sp = spawnpoints[botinfo.info.monument];
                 DoLog($"Respawning bot {botinfo.info.displayName} at {sp.monname}");
                 SpawnBot(sp, botinfo.spawnPos, botinfo.info.kit);
             }
@@ -642,7 +683,7 @@ namespace Oxide.Plugins
             }
         }
 
-        private void SpawnBot(SpawnPoints sp, Vector3 pos, string kit)
+        private void SpawnBot(SpawnProfile sp, Vector3 pos, string kit)
         {
             // Used for initial spawn by LoadBots()
             if (pos == default(Vector3)) return;
@@ -671,6 +712,10 @@ namespace Oxide.Plugins
                     userid = bot.userID,
                     monument = sp.monname,
                     lootable = sp.lootable,
+                    wipeClothing = sp.wipeClothing,
+                    wipeBelt = sp.wipeBelt,
+                    wipeMain = sp.wipeMain,
+                    wipeCorpseMain = sp.wipeCorpseMain,
                     health = sp.startHealth,
                     invulnerable = sp.invulnerable,
                     hostile = sp.hostile,
@@ -725,7 +770,7 @@ namespace Oxide.Plugins
         private void LoadBots(string profile = "")
         {
             DoLog("LoadBots called");
-            foreach (KeyValuePair<string, SpawnPoints> sp in new Dictionary<string, SpawnPoints>(spawnpoints))
+            foreach (KeyValuePair<string, SpawnProfile> sp in new Dictionary<string, SpawnProfile>(spawnpoints))
             {
                 if (profile.Length > 0 && !sp.Key.Equals(profile)) continue;
 
@@ -837,16 +882,23 @@ namespace Oxide.Plugins
 
         private void LoadData()
         {
-            spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<SortedDictionary<string, SpawnPoints>>(Name + "/spawnpoints");
+            spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<SortedDictionary<string, SpawnProfile>>(Name + "/spawnpoints");
 
-            foreach (KeyValuePair<string, SpawnPoints> sp in spawnpoints)
+            foreach (KeyValuePair<string, SpawnProfile> sp in spawnpoints)
             {
                 DoLog($"Loaded profile {sp.Key}");
                 if (monPos.ContainsKey(sp.Key))
                 {
                     sp.Value.monpos = monPos[sp.Key];
                 }
+                if (do1017)
+                {
+                    DoLog("Patching profile for 1.0.17 upgrade");
+                    sp.Value.wipeClothing = true;
+                    sp.Value.wipeBelt = true;
+                }
             }
+            do1017 = false;
         }
 
         private void SaveData()
@@ -874,30 +926,102 @@ namespace Oxide.Plugins
             }
         }
 
-        private void OnEntityDeath(global::HumanNPC npc, HitInfo hitinfo)
+        private void OnEntityDeath(global::HumanNPC humannpc, HitInfo hitinfo)
         {
+            if (humannpc == null) return;
+            MonBotPlayer npc = humannpc.GetComponent<MonBotPlayer>();
             if (npc == null) return;
-            MonBotPlayer hp = npc.GetComponent<MonBotPlayer>();
-            if (hp == null) return;
             DoLog("OnEntityDeath: Found MonBot player");
 
-            if (hp.info.dropWeapon)
+            if (npc.info.dropWeapon)
             {
                 DoLog("OnEntityDeath: Attempting to drop weapon");
-                if (hp.activeItem != null)
+                if (npc.activeItem != null)
                 {
-                    DoLog($"Dropping {hp.info.displayName}'s activeItem: {hp.activeItem.info.shortname}");
+                    DoLog($"Dropping {npc.info.displayName}'s activeItem: {npc.activeItem.info.shortname}");
                     Vector3 vector3 = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.2f, UnityEngine.Random.Range(-2f, 2f));
-                    hp.activeItem.Drop(npc.GetDropPosition(), npc.GetInheritedDropVelocity() + (vector3.normalized * 3f));
-                    npc.svActiveItemID = 0;
+                    npc.activeItem.Drop(humannpc.GetDropPosition(), humannpc.GetInheritedDropVelocity() + (vector3.normalized * 3f));
+                    humannpc.svActiveItemID = 0;
                 }
             }
 
-            DoLog("Checking respawn variable");
-            if (hp?.info.respawn == true)
+            DoLog($"Populating inventory cache for {npc.info.userid}");
+            ItemContainer[] sourceinv = { humannpc.inventory.containerMain, humannpc.inventory.containerWear, humannpc.inventory.containerBelt };
+            InvCache.Add(humannpc.userID, new Inventories());
+            for (int i = 0; i < sourceinv.Length; i++)
             {
-                DoLog($"Setting {hp.info.respawnTimer.ToString()} second respawn timer for {hp.info.displayName} ({hp.info.userid})");
-                timer.Once(hp.info.respawnTimer, () => SpawnBot(hp.info.userid));
+                foreach (Item item in sourceinv[i].itemList)
+                {
+                    InvCache[humannpc.userID].inventory[i].Add(new ItemInfo
+                    {
+                        ID = item.info.itemid,
+                        amount = item.amount,
+                        skinID = item.skin
+                    });
+                }
+            }
+            DoLog($"DONE populating inventory cache for {npc.info.userid}");
+
+            DoLog("Checking respawn variable");
+            if (npc?.info.respawn == true)
+            {
+                DoLog($"Setting {npc.info.respawnTimer.ToString()} second respawn timer for {npc.info.displayName} ({npc.info.userid})");
+                timer.Once(npc.info.respawnTimer, () => SpawnBot(npc.info.userid));
+            }
+        }
+
+        private void OnEntitySpawned(NPCPlayerCorpse corpse)
+        {
+            if (corpse == null) return;
+            ulong userid = corpse?.playerSteamID ?? 0;
+            if (hpcacheid.ContainsKey(userid))
+            {
+                MonBotPlayer npc = hpcacheid[userid];
+                DoLog($"Setting corpse loot panel name to {npc.info.displayName}");
+                corpse._playerName = npc.info.displayName;
+                corpse.lootPanelName = npc.info.displayName;
+
+                timer.Once(0.1f, () =>
+                {
+                    DoLog("Checking corpse lootable flag");
+                    if (npc.info.lootable && InvCache.ContainsKey(userid))
+                    {
+                        for (int i = 0; i < InvCache[userid].inventory.Length; i++)
+                        {
+                            // For main, if wipe is true, the corpse will get a default loot collection rather than what the NPC had
+                            if ((corpse.containers[i].capacity == 24 && !npc.info.wipeMain) ||
+                                (corpse.containers[i].capacity == 7 && !npc.info.wipeClothing) ||
+                                (corpse.containers[i].capacity == 6 && !npc.info.wipeBelt))
+                            {
+                                DoLog($"Copying cached items back from live NPC for container {i.ToString()}");
+                                foreach (ItemInfo item in InvCache[userid].inventory[i])
+                                {
+                                    Item giveItem = ItemManager.CreateByItemID(item.ID, item.amount, item.skinID);
+                                    DoLog($"Copying {item.amount.ToString()} of item {giveItem.info.displayName.english}");
+                                    if (!giveItem.MoveToContainer(corpse.containers[i], -1, true))
+                                    {
+                                        DoLog("Failed to move item :(");
+                                        giveItem.Remove();
+                                    }
+                                }
+                            }
+                        }
+                        if (npc.info.wipeCorpseMain)
+                        {
+                            DoLog("Wiping corpse main inventory");
+                            corpse.containers[0].Clear();
+                        }
+                        timer.Once(5f, () => InvCache.Remove(userid));
+                        ItemManager.DoRemoves();
+                        return;
+                    }
+                    for (int i = 0; i < corpse.containers.Length; i++)
+                    {
+                        DoLog($"Clearing corpse container {i.ToString()}");
+                        corpse.containers[i].Clear();
+                    }
+                    ItemManager.DoRemoves();
+                });
             }
         }
 
@@ -1033,6 +1157,18 @@ namespace Oxide.Plugins
                     break;
                 case "lootable":
                     hp.info.lootable = !GetBoolValue(data);
+                    break;
+                case "wipeclothing":
+                    hp.info.wipeClothing = !GetBoolValue(data);
+                    break;
+                case "wipebelt":
+                    hp.info.wipeBelt = !GetBoolValue(data);
+                    break;
+                case "wipemain":
+                    hp.info.wipeMain = !GetBoolValue(data);
+                    break;
+                case "wipecorpsemain":
+                    hp.info.wipeCorpseMain = !GetBoolValue(data);
                     break;
                 case "hostile":
                     hp.info.hostile = !GetBoolValue(data);
@@ -1212,7 +1348,7 @@ namespace Oxide.Plugins
             CuiHelper.DestroyUi(player, NPCGUI);
 
             if (!spawnpoints.ContainsKey(profile)) return;
-            SpawnPoints sp = spawnpoints[profile];
+            SpawnProfile sp = spawnpoints[profile];
             string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
             CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
@@ -1254,7 +1390,22 @@ namespace Oxide.Plugins
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("lootable"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
+            row++; col++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("wipeclothing"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            col += 2;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("wipebelt"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            col += 2;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("wipemain"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
             row++;
+            posb = GetButtonPositionP(row, 5);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("wipecorpsemain"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
+            row++; col = 0;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("dropweapon"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             row++;
@@ -1313,10 +1464,43 @@ namespace Oxide.Plugins
             if (sp.lootable)
             {
                 UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
+
+                string newcolor = "";
+                int newcol = col + 1;
+                row++;
+                posb = GetButtonPositionP(row, newcol);
+                newcolor = sp.wipeClothing ? "#55d840" : "#d85540";
+                UI.Button(ref container, NPCGUI, UI.Color(newcolor, 1f), sp.wipeClothing.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb wipec {profile}");
+                newcol += 2;
+                posb = GetButtonPositionP(row, newcol);
+                newcolor = sp.wipeBelt ? "#55d840" : "#d85540";
+                UI.Button(ref container, NPCGUI, UI.Color(newcolor, 1f), sp.wipeBelt.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb wipeb {profile}");
+                newcol += 2;
+                posb = GetButtonPositionP(row, newcol);
+                newcolor = sp.wipeMain ? "#55d840" : "#d85540";
+                UI.Button(ref container, NPCGUI, UI.Color(newcolor, 1f), sp.wipeMain.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb wipem {profile}");
+                row++;
+                posb = GetButtonPositionP(row, 6);
+                newcolor = sp.wipeCorpseMain ? "#55d840" : "#d85540";
+                UI.Button(ref container, NPCGUI, UI.Color(newcolor, 1f), sp.wipeCorpseMain.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb wipecm {profile}");
             }
             else
             {
                 UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.lootable.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb loot {profile}");
+
+                int newcol = col + 1;
+                row++;
+                posb = GetButtonPositionP(row, newcol);
+                UI.Label(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.wipeClothing.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+                newcol += 2;
+                posb = GetButtonPositionP(row, newcol);
+                UI.Label(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.wipeBelt.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+                newcol += 2;
+                posb = GetButtonPositionP(row, newcol);
+                UI.Label(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.wipeMain.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+                row++;
+                posb = GetButtonPositionP(row, 6);
+                UI.Label(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.wipeCorpseMain.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             }
             row++;
             posb = GetButtonPositionP(row, col);
@@ -1398,7 +1582,7 @@ namespace Oxide.Plugins
             UI.Label(ref container, NPCGUN, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
             UI.Button(ref container, NPCGUN, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb namesclose");
 
-            SpawnPoints sp = spawnpoints[profile];
+            SpawnProfile sp = spawnpoints[profile];
             int col = 0; int row = 0;
 
             float[] posb = GetButtonPositionP(row, col);
@@ -1441,7 +1625,7 @@ namespace Oxide.Plugins
             UI.Label(ref container, NPCGUK, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
             UI.Button(ref container, NPCGUK, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb selkitclose");
 
-            SpawnPoints sp = spawnpoints[profile];
+            SpawnProfile sp = spawnpoints[profile];
             int col = 0;
             int row = 0;
 
@@ -1558,7 +1742,7 @@ namespace Oxide.Plugins
         #endregion utility
 
         #region classes
-        public class SpawnPoints
+        public class SpawnProfile
         {
             public string monname;
             public Vector3 monpos;
@@ -1571,6 +1755,10 @@ namespace Oxide.Plugins
             public bool invulnerable;
             public bool respawn;
             public bool lootable;
+            public bool wipeClothing;
+            public bool wipeBelt;
+            public bool wipeMain;
+            public bool wipeCorpseMain;
             public bool dropWeapon;
             public bool hostile;
             public List<string> kits;
@@ -1599,6 +1787,10 @@ namespace Oxide.Plugins
             public bool dropWeapon;
             public bool invulnerable;
             public bool lootable;
+            public bool wipeClothing;
+            public bool wipeBelt;
+            public bool wipeMain;
+            public bool wipeCorpseMain;
             public bool entrypause;
             public bool respawn;
 
@@ -1980,14 +2172,6 @@ namespace Oxide.Plugins
             }
         }
 
-//        private void StartSleeping(BasePlayer player)
-//        {
-//            if (player.IsSleeping()) return;
-//            player.SetPlayerFlag(BasePlayer.PlayerFlags.Sleeping, true);
-//            if (!BasePlayer.sleepingPlayerList.Contains(player)) BasePlayer.sleepingPlayerList.Add(player);
-//            player.CancelInvoke("InventoryUpdate");
-//        }
-
         public static Vector3 StringToVector3(string sVector)
         {
             // Remove the parentheses
@@ -2116,6 +2300,11 @@ namespace Oxide.Plugins
         private void LoadConfigVariables()
         {
             configData = Config.ReadObject<ConfigData>();
+
+            if (configData.Version < new VersionNumber(1, 0, 17))
+            {
+                do1017 = true;
+            }
 
             configData.Version = Version;
             SaveConfig(configData);

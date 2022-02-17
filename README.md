@@ -50,6 +50,10 @@ Here is an example showing two monuments:
     "startHealth": 200.0,
     "invulnerable": false,
     "lootable": false,
+    "wipeClothing": true,
+    "wipeBelt": true,
+    "wipeMain": true,
+    "wipeCorpseMain": false,
     "dropWeapon": false,
     "hostile": false,
     "kits": null,
@@ -67,6 +71,10 @@ Here is an example showing two monuments:
     "startHealth": 200.0,
     "invulnerable": false,
     "lootable": false,
+    "wipeClothing": true,
+    "wipeBelt": false,
+    "wipeMain": true,
+    "wipeCorpseMain": false,
     "dropWeapon": false,
     "hostile": false,
     "kits": null,
@@ -80,6 +88,12 @@ For each monument you want to populate, you would start by setting the spawnCoun
 Next, you can pick a name or set of names to be randomly assigned to the bots if desired.
 
 You can and probably do want to assign a kit from the Kits plugin to them.  This setting can also be an array of kits if desired.
+
+Beyond the lootable flag, you can set the following items, which are only relevant if lootable == true:
+  - wipeClothing -- Do not copy clothes the NPC wore to the corpse (default true)
+  - wipeBelt -- Do not copy items the NPC had in their belt to the corpse (default true)
+  - wipeMain -- Do not copy items the NPC had in their main inventory to the corpse (default true)
+  - wipeCorpseMain -- Delete the default loot added to an NPC corpse main inventory (default false)  Note that you probably want to set EITHER wipeMain or wipeCorpseMain to true, or set both to false
 
 Leave pos: [] alone.  This will be populated at runtime with the spawn point of each bot in case you have to look for them, etc.
 
@@ -95,6 +109,10 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
     "startHealth": 200.0,
     "invulnerable": false,
     "lootable": false,
+    "wipeClothing": true,
+    "wipeBelt": true,
+    "wipeMain": true,
+    "wipeCorpseMain": false,
     "dropWeapon": false,
     "hostile": false,
     "kits": [
@@ -118,6 +136,10 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
     "startHealth": 200.0,
     "invulnerable": false,
     "lootable": false,
+    "wipeClothing": true,
+    "wipeBelt": false,
+    "wipeMain": true,
+    "wipeCorpseMain": false,
     "dropWeapon": false,
     "hostile": false,
     "kits": {
@@ -131,7 +153,7 @@ Leave pos: [] alone.  This will be populated at runtime with the spawn point of 
   },
 ```
 
-You can also adjust the startHealth and other values as you like.  Not everything is working yet, but they do fight and hide and do all of the usual NPC things you might expect.
+You can also adjust the startHealth and other values as you like.
 
 USE THE GUI - /mb
 
