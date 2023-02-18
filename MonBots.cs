@@ -1,7 +1,7 @@
 #region License (GPL v2)
 /*
     MonBots - NPC Players that protect monuments, sort of
-    Copyright (c) 2021 RFC1920 <desolationoutpostpve@gmail.com>
+    Copyright (c) 2021-2023 RFC1920 <desolationoutpostpve@gmail.com>
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License v2.0.
@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.18")]
+    [Info("MonBots", "RFC1920", "1.0.19")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -45,7 +45,7 @@ namespace Oxide.Plugins
         private const string sci = "assets/rust.ai/agents/npcplayer/humannpc/scientist/scientistnpc_roam.prefab";
         private List<ulong> isopen = new List<ulong>();
 
-        private const string permNPCGuiUse = "monbot.use";
+        //private const string permNPCGuiUse = "monbot.use";
         private const string NPCGUI = "monbot.editor";
         private const string NPCGUK = "monbot.kitselect";
         private const string NPCGUM = "monbot.monselect";
@@ -101,6 +101,7 @@ namespace Oxide.Plugins
                 ["end"] = "End",
                 ["gotospawn"] = "Go There",
                 ["hostile"] = "Hostile",
+                ["silent"] = "Silence Effects",
                 ["invulnerable"] = "Invulnerable",
                 ["kit(s)"] = "Kit(s)",
                 ["lootable"] = "Lootable",
@@ -421,6 +422,16 @@ namespace Oxide.Plugins
                             NPCProfileEditGUI(player, monname);
                         }
                         break;
+                    case "silent":
+                        {
+                            List<string> newarg = new List<string>(args);
+                            newarg.RemoveAt(0);
+                            string monname = string.Join(" ", newarg);
+                            spawnpoints[monname].silent = !spawnpoints[monname].silent;
+                            SaveData();
+                            NPCProfileEditGUI(player, monname);
+                        }
+                        break;
                     case "names":
                         {
                             List<string> newarg = new List<string>(args);
@@ -488,7 +499,9 @@ namespace Oxide.Plugins
                             List<string> newarg = new List<string>(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
-                            Teleport(player, spawnpoints[monname].monpos);
+                            Vector3 newpos = spawnpoints[monname].monpos;
+                            newpos.y = TerrainMeta.HeightMap.GetHeight(newpos);
+                            Teleport(player, newpos);
                         }
                         break;
                     case "spawnhere":
@@ -667,6 +680,7 @@ namespace Oxide.Plugins
                         health = sp.startHealth,
                         invulnerable = sp.invulnerable,
                         hostile = sp.hostile,
+                        silent = sp.silent,
                         dropWeapon = sp.dropWeapon,
                         detectRange = sp.detectRange,
                         roamRange = sp.roamRange,
@@ -700,17 +714,20 @@ namespace Oxide.Plugins
                         Kits?.Call("GiveKit", bot, kit);
                     }
 
-                    DoLog("Silencing effects");
-                    ScientistNPC npc = bot as ScientistNPC;
-                    npc.DeathEffects = new GameObjectRef[0];
-                    npc.RadioChatterEffects = new GameObjectRef[0];
-                    npc.radioChatterType = ScientistNPC.RadioChatterType.NONE;
-
+                    if (mono.info.silent)
+                    {
+                        DoLog("Silencing effects");
+                        ScientistNPC npc = bot as ScientistNPC;
+                        npc.DeathEffects = new GameObjectRef[0];
+                        npc.RadioChatterEffects = new GameObjectRef[0];
+                        npc.radioChatterType = ScientistNPC.RadioChatterType.NONE;
+                        npc.SetChatterType(ScientistNPC.RadioChatterType.NONE);
+                    }
                     timer.Once(5f, () => mono.activeItem = bot.GetActiveItem());
                 }
-                catch(Exception ex)
+                catch //(Exception ex)
                 {
-                    DoLog($"Unable to setup bot {botname} at {sp.monname} ({pos}) - {ex}");
+                    DoLog($"Unable to setup bot {botname} at {sp.monname} ({pos}) - Possible navmesh issue.");
                 }
             });
 
@@ -1248,6 +1265,9 @@ namespace Oxide.Plugins
                 case "hostile":
                     hp.info.hostile = !GetBoolValue(data);
                     break;
+                case "silent":
+                    hp.info.silent = !GetBoolValue(data);
+                    break;
                 case "canmove":
                     hp.info.canmove = !GetBoolValue(data);
                     break;
@@ -1426,12 +1446,12 @@ namespace Oxide.Plugins
             string description = Lang("npcgui") + ": " + profile + " " + Lang("profile");
             CuiElementContainer container = UI.Container(NPCGUI, UI.Color("242424", 1f), "0.1 0.1", "0.9 0.9", true, "Overlay");
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), description, 18, "0.23 0.92", "0.7 1");
-            if (!monPos.ContainsKey(profile))
-            {
-                UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
-                UI.Button(ref container, NPCGUI, UI.Color("#4055d8", 1f), Lang("movehere"), 12, "0.78 0.02", "0.84 0.06", $"mb spawnhere {profile}");
-                UI.Button(ref container, NPCGUI, UI.Color("#40d855", 1f), Lang("gotospawn"), 12, "0.85 0.02", "0.91 0.06", $"mb gothere {profile}");
-            }
+            //if (!monPos.ContainsKey(profile))
+            //{
+            UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("delete"), 12, "0.71 0.95", "0.77 0.98", $"mb delete {profile}");
+            UI.Button(ref container, NPCGUI, UI.Color("#4055d8", 1f), Lang("movehere"), 12, "0.78 0.02", "0.84 0.06", $"mb spawnhere {profile}");
+            UI.Button(ref container, NPCGUI, UI.Color("#40d855", 1f), Lang("gotospawn"), 12, "0.85 0.02", "0.91 0.06", $"mb gothere {profile}");
+            //}
             UI.Button(ref container, NPCGUI, UI.Color("#ff4040", 1f), Lang("respawn"), 12, "0.78 0.95", "0.84 0.98", $"mb respawn {profile}");
             UI.Button(ref container, NPCGUI, UI.Color("#5540d8", 1f), Lang("select"), 12, "0.85 0.95", "0.91 0.98", "mb");
             UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), Lang("close"), 12, "0.92 0.95", "0.985 0.98", "mb close");
@@ -1485,6 +1505,10 @@ namespace Oxide.Plugins
             row++;
             posb = GetButtonPositionP(row, col);
             UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("hostile"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+
+            row++;
+            posb = GetButtonPositionP(row, col);
+            UI.Label(ref container, NPCGUI, UI.Color("#ffffff", 1f), Lang("silent"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
 
             col = 3; row = 0;
             posb = GetButtonPositionP(row, col);
@@ -1593,6 +1617,16 @@ namespace Oxide.Plugins
             else
             {
                 UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.hostile.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb hostile {profile}");
+            }
+            row++;
+            posb = GetButtonPositionP(row, col);
+            if (sp.silent)
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#55d840", 1f), sp.silent.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb silent {profile}");
+            }
+            else
+            {
+                UI.Button(ref container, NPCGUI, UI.Color("#d85540", 1f), sp.silent.ToString(), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb silent {profile}");
             }
 
             col = 4;
@@ -1830,6 +1864,7 @@ namespace Oxide.Plugins
                 wipeMain = false,
                 wipeCorpseMain = false,
                 hostile = false,
+                silent = true,
                 invulnerable = false,
                 dropWeapon = false,
                 spawnCount = quantity,
@@ -1878,6 +1913,7 @@ namespace Oxide.Plugins
             public bool wipeCorpseMain;
             public bool dropWeapon;
             public bool hostile;
+            public bool silent;
             public List<string> kits;
             public List<string> names;
             public List<ulong> ids;
@@ -1903,6 +1939,7 @@ namespace Oxide.Plugins
 
             public bool ephemeral;
             public bool hostile;
+            public bool silent;
             public bool dropWeapon;
             public bool invulnerable;
             public bool lootable;
@@ -1981,6 +2018,7 @@ namespace Oxide.Plugins
                 player = GetComponent<global::HumanNPC>();
                 melee = GetComponent<BaseMelee>();
                 InvokeRepeating("GoHome", 1f, 1f);
+                InvokeRepeating("Silence", 10f, 19f);
             }
 
             private void FixedUpdate()
@@ -2042,6 +2080,15 @@ namespace Oxide.Plugins
             private void ResetCanHurt()
             {
                 canHurt = true;
+            }
+
+            private void Silence()
+            {
+                if (!info.silent) return;
+                if (player?.IsDestroyed != false) return;
+                Instance.DoLog($"Silencing effects for {player?.UserIDString}");
+                ScientistNPC npc = player as ScientistNPC;
+                npc.SetChatterType(ScientistNPC.RadioChatterType.NONE);
             }
 
             private void GoHome()

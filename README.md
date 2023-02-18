@@ -157,3 +157,25 @@ You can also adjust the startHealth and other values as you like.
 
 USE THE GUI - /mb
 
+## For Developers
+
+  - private bool IsMonBot(ScientistNPC player)
+
+    Given a ScientistNPC object, determine whether or not this is a MonBot
+
+
+  - private string[] AddGroupSpawn(Vector3 location, string profileName, string group, int quantity)
+
+    Spawn a group of bots at a specific location using either a new or existing profile (group)
+
+
+  - private string[] RemoveGroupSpawn(string group)
+
+    Remove a profile (group) and associated bots
+
+
+  - private string GetMonBotName(ulong npcid)
+
+    Return the bot name given its userid
+
+
