@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.19")]
+    [Info("MonBots", "RFC1920", "1.0.20")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -914,7 +914,27 @@ namespace Oxide.Plugins
         {
             Interface.Oxide.DataFileSystem.WriteObject(Name + "/spawnpoints", spawnpoints);
         }
+        private object OnServerCommand(ConsoleSystem.Arg arg)
+        {
+            BasePlayer player = arg.Player();
+            if (player == null) return null;
 
+            if (!arg.cmd.FullName.StartsWith("mb") && isopen.Contains(ulong.Parse(player.UserIDString)))
+            {
+                return false;
+            }
+            return null;
+        }
+
+        private object OnPlayerCommand(IPlayer player, string command, string[] args)
+        {
+            if (command != "mb" && isopen.Contains(ulong.Parse(player.Id)))
+            {
+                if (configData.Options.debug) Puts($"OnPlayerCommand: {command} BLOCKED");
+                return true;
+            }
+            return null;
+        }
         private void OnPlayerInput(BasePlayer player, InputState input)
         {
             if (player == null || input == null) return;
@@ -940,7 +960,7 @@ namespace Oxide.Plugins
             if (npc == null) return;
             DoLog("OnEntityDeath: Found MonBot player");
 
-            hpcacheid.Remove(humannpc.net.ID);
+            hpcacheid.Remove((uint)humannpc.net.ID.Value);
 
             if (npc.info.dropWeapon)
             {
@@ -950,7 +970,7 @@ namespace Oxide.Plugins
                     DoLog($"Dropping {npc.info.displayName}'s activeItem: {npc.activeItem.info.shortname}");
                     Vector3 vector3 = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.2f, UnityEngine.Random.Range(-2f, 2f));
                     npc.activeItem.Drop(humannpc.GetDropPosition(), humannpc.GetInheritedDropVelocity() + (vector3.normalized * 3f));
-                    humannpc.svActiveItemID = 0;
+                    humannpc.svActiveItemID.Value = 0;
                 }
             }
 
@@ -1161,7 +1181,7 @@ namespace Oxide.Plugins
                 foreach (ulong botid in profile.Value.ids)
                 {
                     flag = true;
-                    BaseNetworkable.serverEntities.Find((uint)botid)?.Kill();
+                    BaseNetworkable.serverEntities.Find(new NetworkableId(botid))?.Kill();
                 }
             }
             profile.Value.zonemap.Remove(group);
@@ -1199,7 +1219,7 @@ namespace Oxide.Plugins
             foreach (ulong id in spawnpoints[group].ids)
             {
                 // Remove the bots
-                BaseNetworkable.serverEntities.Find((uint)id)?.Kill();
+                BaseNetworkable.serverEntities.Find(new NetworkableId(id))?.Kill();
                 ids[i] = id.ToString();
                 i++;
             }
