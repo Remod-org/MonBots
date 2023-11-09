@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.20")]
+    [Info("MonBots", "RFC1920", "1.0.21")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -77,7 +77,7 @@ namespace Oxide.Plugins
         {
             if (configData.Options.debug)
             {
-                Interface.Oxide.LogInfo(message);
+                Interface.Oxide.LogInfo($"{Name}: {message}");
             }
         }
         #endregion Message
@@ -842,7 +842,7 @@ namespace Oxide.Plugins
 
         private Vector3 AdjustSpawnPoint(Vector3 pos, float radius)
         {
-            Vector3 newpos = new Vector3() { x = pos.x, y = pos.y, z = pos.z };
+            Vector3 newpos;// = new Vector3() { x = pos.x, y = pos.y, z = pos.z };
             Vector2 rand;
             bool ok = false;
             int i = 0;
@@ -1148,6 +1148,7 @@ namespace Oxide.Plugins
         // For DynamicPVP, etc.
         private string[] AddGroupSpawn(Vector3 location, string profileName, string group)
         {
+            DoLog($"AddGroupSpawn({location}, {profileName}, {group})");
             if (location == new Vector3() || profileName == null || group == null)
             {
                 return new string[] { "error", "Null parameter" };
@@ -1169,6 +1170,7 @@ namespace Oxide.Plugins
 
         private string[] RemoveGroupSpawn(string group)
         {
+            DoLog($"RemoveGroupSpawn({group})");
             if (group == null)
             {
                 return new string[] { "error", "No group specified." };
@@ -2106,7 +2108,7 @@ namespace Oxide.Plugins
             {
                 if (!info.silent) return;
                 if (player?.IsDestroyed != false) return;
-                Instance.DoLog($"Silencing effects for {player?.UserIDString}");
+                Instance.DoLog($"Silencing effects for {player?.UserIDString}@{info.monument}");
                 ScientistNPC npc = player as ScientistNPC;
                 npc.SetChatterType(ScientistNPC.RadioChatterType.NONE);
             }
@@ -2392,7 +2394,6 @@ namespace Oxide.Plugins
 
         private void FindMonuments()
         {
-            Vector3 extents = Vector3.zero;
             foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsOfType<MonumentInfo>())
             {
                 if (monument.name.Contains("power_sub"))
@@ -2401,8 +2402,7 @@ namespace Oxide.Plugins
                 }
 
                 float realWidth = 0f;
-                string name = null;
-
+                string name;
                 if (monument.name == "OilrigAI")
                 {
                     name = "Small Oilrig";
@@ -2413,31 +2413,20 @@ namespace Oxide.Plugins
                     name = "Large Oilrig";
                     realWidth = 200f;
                 }
+                else if (monument.name == "assets/bundled/prefabs/autospawn/monument/medium/radtown_small_3.prefab")
+                {
+                    name = "Sewer Branch";
+                    realWidth = 100;
+                }
                 else
                 {
                     name = Regex.Match(monument.name, @"\w{6}\/(.+\/)(.+)\.(.+)").Groups[2].Value.Replace("_", " ").Replace(" 1", "").Titleize() + " 0";
                 }
-                if (monPos.ContainsKey(name))
-                {
-                    if (monPos[name] == monument.transform.position) continue;
-                    string newname = name.Remove(name.Length - 1, 1) + "1";
-                    if (monPos.ContainsKey(newname))
-                    {
-                        newname = name.Remove(name.Length - 1, 1) + "2";
-                    }
-                    if (monPos.ContainsKey(newname))
-                    {
-                        continue;
-                    }
-                    name = newname;
-                }
+                if (monPos.ContainsKey(name.Trim())) continue;
+                if (monSize.ContainsKey(name.Trim())) continue;
+                if (cavePos.ContainsKey(name.Trim())) continue;
 
-                if (cavePos.ContainsKey(name))
-                {
-                    name += RandomString();
-                }
-
-                extents = monument.Bounds.extents;
+                Vector3 extents = monument.Bounds.extents;
                 if (realWidth > 0f)
                 {
                     extents.z = realWidth;
