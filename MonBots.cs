@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.21")]
+    [Info("MonBots", "RFC1920", "1.0.22")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -2230,7 +2230,8 @@ namespace Oxide.Plugins
                             Command = command + text,
                             FontSize = size,
                             IsPassword = false,
-                            Text = text
+                            Text = text,
+                            NeedsKeyboard = true
                         },
                         new CuiRectTransformComponent { AnchorMin = min, AnchorMax = max },
                         new CuiNeedsCursorComponent()
