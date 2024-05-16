@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.22")]
+    [Info("MonBots", "RFC1920", "1.0.23")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -77,7 +77,7 @@ namespace Oxide.Plugins
         {
             if (configData.Options.debug)
             {
-                Interface.Oxide.LogInfo($"{Name}: {message}");
+                Interface.GetMod().LogInfo($"{Name}: {message}");
             }
         }
         #endregion Message
@@ -781,6 +781,7 @@ namespace Oxide.Plugins
                     }
                 }
             }
+            newsave = false;
         }
 
         private void LoadBots(Vector3 location, string profile, string group, int quantity = 0)
@@ -891,7 +892,7 @@ namespace Oxide.Plugins
         #region Oxide Hooks
         private void LoadData()
         {
-            spawnpoints = Interface.Oxide.DataFileSystem.ReadObject<SortedDictionary<string, SpawnProfile>>(Name + "/spawnpoints");
+            spawnpoints = Interface.GetMod().DataFileSystem.ReadObject<SortedDictionary<string, SpawnProfile>>(Name + "/spawnpoints");
 
             foreach (KeyValuePair<string, SpawnProfile> sp in spawnpoints)
             {
@@ -912,7 +913,7 @@ namespace Oxide.Plugins
 
         private void SaveData()
         {
-            Interface.Oxide.DataFileSystem.WriteObject(Name + "/spawnpoints", spawnpoints);
+            Interface.GetMod().DataFileSystem.WriteObject(Name + "/spawnpoints", spawnpoints);
         }
         private object OnServerCommand(ConsoleSystem.Arg arg)
         {
@@ -948,7 +949,7 @@ namespace Oxide.Plugins
 
                 if (hp == null) return;
 
-                Interface.Oxide.CallHook("OnUseNPC", hp.player, player);
+                Interface.GetMod().CallHook("OnUseNPC", hp.player, player);
                 SaveData();
             }
         }
@@ -1062,7 +1063,7 @@ namespace Oxide.Plugins
             MonBotPlayer hp = entity.GetComponent<MonBotPlayer>();
             if (hp != null)
             {
-                Interface.Oxide.CallHook("OnHitNPC", entity.GetComponent<BaseCombatEntity>(), hitinfo);
+                Interface.GetMod().CallHook("OnHitNPC", entity.GetComponent<BaseCombatEntity>(), hitinfo);
                 if (hp.info.invulnerable)
                 {
                     //hitinfo.damageTypes = new DamageTypeList();
@@ -1125,7 +1126,7 @@ namespace Oxide.Plugins
         //{
         //    if (npcs.ContainsKey(target.userID))
         //    {
-        //        Interface.Oxide.CallHook("OnLootNPC", looter.inventory.loot, target, target.userID);
+        //        Interface.GetMod().CallHook("OnLootNPC", looter.inventory.loot, target, target.userID);
         //    }
         //}
 
@@ -1137,7 +1138,7 @@ namespace Oxide.Plugins
         //    npcs.TryGetValue(userId, out hi);
         //    if (hi != null)
         //    {
-        //        Interface.Oxide.CallHook("OnLootNPC", looter.inventory.loot, entity, userId);
+        //        Interface.GetMod().CallHook("OnLootNPC", looter.inventory.loot, entity, userId);
         //    }
         //}
         #endregion Oxide Hooks
@@ -2070,7 +2071,7 @@ namespace Oxide.Plugins
 
             private void DoTriggerDown()
             {
-                BasePlayer attackPlayer = player.Brain.Senses.Players.FirstOrDefault()?.ToPlayer();
+                BasePlayer attackPlayer = player.Brain.Senses.Players.First()?.ToPlayer();
 
                 if (attackPlayer != null)
                 {
@@ -2357,7 +2358,7 @@ namespace Oxide.Plugins
 
             if (player.net?.connection != null)
             {
-                player.ClientRPCPlayer(null, player, "StartLoading");
+                player.ClientRPC(RpcTarget.Player("StartLoading", player));
             }
         }
 
