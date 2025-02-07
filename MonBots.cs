@@ -33,7 +33,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.23")]
+    [Info("MonBots", "RFC1920", "1.0.24")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -58,7 +58,7 @@ namespace Oxide.Plugins
 
         public static MonBots Instance;
         public SortedDictionary<string, SpawnProfile> spawnpoints = new SortedDictionary<string, SpawnProfile>();
-//        private Dictionary<string, MonBotsZoneMap> zonemaps = new Dictionary<string, MonBotsZoneMap>();
+        //        private Dictionary<string, MonBotsZoneMap> zonemaps = new Dictionary<string, MonBotsZoneMap>();
         private Dictionary<ulong, MonBotPlayer> hpcacheid = new Dictionary<ulong, MonBotPlayer>();
 
         private static SortedDictionary<string, Vector3> monPos = new SortedDictionary<string, Vector3>();
@@ -704,6 +704,7 @@ namespace Oxide.Plugins
                     bot.Brain.Navigator.BestRoamPointMaxDistance = mono.info.roamRange;
                     bot.Brain.Navigator.MaxRoamDistanceFromHome = mono.info.roamRange;
                     bot.Brain.Senses.Init(bot, bot.Brain, 5f, mono.info.roamRange, mono.info.detectRange, -1f, true, false, true, mono.info.detectRange, !mono.info.hostile, false, true, EntityType.Player, false);
+                    bot.Brain.Navigator.Resume();
 
                     DoLog("Setting name and inventory");
                     bot.displayName = botname;
@@ -849,6 +850,7 @@ namespace Oxide.Plugins
             int i = 0;
             const int max = 250;
 
+            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
             while (!ok)
             {
                 i++;
@@ -871,7 +873,6 @@ namespace Oxide.Plugins
                     return newpos;
                 }
             }
-            pos.y = TerrainMeta.HeightMap.GetHeight(pos);
             return pos;
         }
 
@@ -1144,7 +1145,11 @@ namespace Oxide.Plugins
         #endregion Oxide Hooks
 
         #region Our Inbound Hooks
-        private bool IsMonBot(ScientistNPC player) => player.GetComponentInParent<MonBotPlayer>() != null;
+        private bool IsMonBot(ScientistNPC player)
+        {
+            DoLog($"Is this a MonBot? - {player?.displayName}");
+            return player.GetComponentInParent<MonBotPlayer>() != null;
+        }
 
         // For DynamicPVP, etc.
         private string[] AddGroupSpawn(Vector3 location, string profileName, string group)
@@ -1696,7 +1701,7 @@ namespace Oxide.Plugins
             const int col = 0; const int row = 0;
             float[] posb = GetButtonPositionP(row, col);
 
-            UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUP, UI.Color("#535353", 1f), Lang("new"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             UI.Input(ref container, NPCGUP, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", "mb newprofile ");
 
             CuiHelper.AddUi(player, container);
@@ -1738,7 +1743,7 @@ namespace Oxide.Plugins
                 row++;
                 posb = GetButtonPositionP(row, col);
             }
-            UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), Lang("new"),12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
+            UI.Label(ref container, NPCGUN, UI.Color("#535353", 1f), Lang("new"), 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}");
             UI.Input(ref container, NPCGUN, UI.Color("#ffffff", 1f), "", 12, $"{posb[0]} {posb[1]}", $"{posb[0] + ((posb[2] - posb[0]) / 2)} {posb[3]}", $"mb name NEW_NAME {profile} ");
 
             CuiHelper.AddUi(player, container);
@@ -1784,7 +1789,7 @@ namespace Oxide.Plugins
         }
 
         // Determine open GUI to limit interruptions
-        private void IsOpen(ulong uid, bool set=false)
+        private void IsOpen(ulong uid, bool set = false)
         {
             if (set)
             {
@@ -1869,7 +1874,7 @@ namespace Oxide.Plugins
             //hp.player.inventory.ServerUpdate(0f);
         }
 
-        private void AddProfile(Vector3 location, string profile, string mongroupname="", int quantity=0)
+        private void AddProfile(Vector3 location, string profile, string mongroupname = "", int quantity = 0)
         {
             // monname could be a monument/profile name or the string value of a ZoneManager zoneid, etc., if mongroupname is set.
             // Er... maybe?
@@ -2042,6 +2047,34 @@ namespace Oxide.Plugins
                 melee = GetComponent<BaseMelee>();
                 InvokeRepeating("GoHome", 1f, 1f);
                 InvokeRepeating("Silence", 10f, 19f);
+                Invoke("_UseBrain", 0.1f);
+            }
+
+            public void _UseBrain()
+            {
+                #region navigation
+                player.Brain.Navigator.Agent.agentTypeID = -1372625422;
+                player.Brain.Navigator.DefaultArea = "Walkable";
+                player.Brain.Navigator.Agent.autoRepath = true;
+                player.Brain.Navigator.enabled = true;
+                player.Brain.Navigator.CanUseNavMesh = true;
+                player.Brain.Navigator.BestCoverPointMaxDistance = info.roamRange / 2;
+                player.Brain.Navigator.BestRoamPointMaxDistance = info.roamRange;
+                player.Brain.Navigator.MaxRoamDistanceFromHome = info.roamRange;
+                player.Brain.Navigator.Init(player, player.Brain.Navigator.Agent);
+                player.Brain.Navigator.SetDestination(spawnPos, BaseNavigator.NavigationSpeed.Normal, 0f, 0f);
+                #endregion
+
+                #region senses & Targeting
+                player.Brain.ForceSetAge(0);
+                player.Brain.AllowedToSleep = false;
+                player.Brain.sleeping = false;
+                player.Brain.SenseRange = info.detectRange;
+                player.Brain.ListenRange = info.detectRange;
+                player.Brain.TargetLostRange = 25f;
+                player.Brain.HostileTargetsOnly = info.hostile;
+                player.Brain.IgnoreSafeZonePlayers = true;
+                #endregion
             }
 
             private void FixedUpdate()
@@ -2065,7 +2098,7 @@ namespace Oxide.Plugins
                 {
                     inmelee = false;
                     CancelInvoke("DoTriggerDown");
-                    player.Brain.states[AIState.Roam].StateEnter(player.Brain, player);
+                    //player.Brain.states[AIState.Roam].StateEnter(player.Brain, player);
                 }
             }
 
@@ -2083,7 +2116,7 @@ namespace Oxide.Plugins
                         {
                             Instance.DoLog($"TriggerDown on {attackPlayer.displayName}");
                             //player.TriggerDown();
-                            melee.ServerUse(player.damageScale, null);
+                            melee.ServerUse(player.damageScale);
 
                             Instance.timer.Once(triggerDelay, () =>
                             {
