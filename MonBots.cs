@@ -1859,7 +1859,6 @@ namespace Oxide.Plugins
 
             if (hp.info.kit.Length > 0)
             {
-                //DoLog($"  Trying to give kit '{hp.info.kit}' to {hp.player.userID}");
                 Kits?.Call("GiveKit", hp.player, hp.info.kit);
             }
             //hp.player.SV_ClothingChanged();
