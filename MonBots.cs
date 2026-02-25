@@ -30,10 +30,11 @@ using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
+using UnityEngine.AI;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.24")]
+    [Info("MonBots", "RFC1920", "1.0.25")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -43,7 +44,7 @@ namespace Oxide.Plugins
 
         private ConfigData configData;
         private const string sci = "assets/rust.ai/agents/npcplayer/humannpc/scientist/scientistnpc_roam.prefab";
-        private List<ulong> isopen = new List<ulong>();
+        private List<ulong> isopen = new();
 
         //private const string permNPCGuiUse = "monbot.use";
         private const string NPCGUI = "monbot.editor";
@@ -51,20 +52,20 @@ namespace Oxide.Plugins
         private const string NPCGUM = "monbot.monselect";
         private const string NPCGUN = "monbot.kitsetnames";
         private const string NPCGUP = "monbot.newprofile";
-        private readonly List<string> guis = new List<string>() { NPCGUI, NPCGUK, NPCGUM, NPCGUN, NPCGUP };
+        private readonly List<string> guis = new() { NPCGUI, NPCGUK, NPCGUM, NPCGUN, NPCGUP };
 
         private bool newsave;
         private bool do1017;
 
         public static MonBots Instance;
-        public SortedDictionary<string, SpawnProfile> spawnpoints = new SortedDictionary<string, SpawnProfile>();
+        public SortedDictionary<string, SpawnProfile> spawnpoints = new();
         //        private Dictionary<string, MonBotsZoneMap> zonemaps = new Dictionary<string, MonBotsZoneMap>();
-        private Dictionary<ulong, MonBotPlayer> hpcacheid = new Dictionary<ulong, MonBotPlayer>();
+        private Dictionary<ulong, MonBotPlayer> hpcacheid = new();
 
-        private static SortedDictionary<string, Vector3> monPos = new SortedDictionary<string, Vector3>();
-        private static SortedDictionary<string, Vector3> monSize = new SortedDictionary<string, Vector3>();
-        private static SortedDictionary<string, Vector3> cavePos = new SortedDictionary<string, Vector3>();
-        private Dictionary<ulong, Inventories> InvCache = new Dictionary<ulong, Inventories>();
+        private static SortedDictionary<string, Vector3> monPos = new();
+        private static SortedDictionary<string, Vector3> monSize = new();
+        private static SortedDictionary<string, Vector3> cavePos = new();
+        private Dictionary<ulong, Inventories> InvCache = new();
 
         private readonly static int playerMask = LayerMask.GetMask("Player (Server)");
         #endregion vars
@@ -226,14 +227,18 @@ namespace Oxide.Plugins
                         break;
                     case "sc":
                         {
-                            int intval = int.Parse(args.Last());
-                            List<string> newarg = new List<string>(args);
-                            newarg.RemoveAt(0);
-                            newarg.RemoveAt(newarg.Count - 1);
-                            string monname = string.Join(" ", newarg);
-                            spawnpoints[monname].spawnCount = intval;
-                            SaveData();
-                            NPCProfileEditGUI(player, monname);
+                            try
+                            {
+                                int intval = int.Parse(args.Last());
+                                List<string> newarg = new(args);
+                                newarg.RemoveAt(0);
+                                newarg.RemoveAt(newarg.Count - 1);
+                                string monname = string.Join(" ", newarg);
+                                spawnpoints[monname].spawnCount = intval;
+                                SaveData();
+                                NPCProfileEditGUI(player, monname);
+                            }
+                            catch { }
                         }
                         break;
                     case "bsr":
@@ -251,7 +256,7 @@ namespace Oxide.Plugins
                     case "sr":
                         {
                             int intval = int.Parse(args.Last());
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
@@ -275,7 +280,7 @@ namespace Oxide.Plugins
                     case "rt":
                         {
                             int intval = int.Parse(args.Last());
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
@@ -299,7 +304,7 @@ namespace Oxide.Plugins
                     case "dr":
                         {
                             float fval = float.Parse(args.Last());
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
@@ -323,7 +328,7 @@ namespace Oxide.Plugins
                     case "rr":
                         {
                             float fval = float.Parse(args.Last());
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
                             string monname = string.Join(" ", newarg);
@@ -334,7 +339,7 @@ namespace Oxide.Plugins
                         break;
                     case "rs":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].respawn = !spawnpoints[monname].respawn;
@@ -344,7 +349,7 @@ namespace Oxide.Plugins
                         break;
                     case "inv":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].invulnerable = !spawnpoints[monname].invulnerable;
@@ -354,7 +359,7 @@ namespace Oxide.Plugins
                         break;
                     case "loot":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].lootable = !spawnpoints[monname].lootable;
@@ -364,7 +369,7 @@ namespace Oxide.Plugins
                         break;
                     case "wipec":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].wipeClothing = !spawnpoints[monname].wipeClothing;
@@ -374,7 +379,7 @@ namespace Oxide.Plugins
                         break;
                     case "wipeb":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].wipeBelt = !spawnpoints[monname].wipeBelt;
@@ -384,7 +389,7 @@ namespace Oxide.Plugins
                         break;
                     case "wipem":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].wipeMain = !spawnpoints[monname].wipeMain;
@@ -394,7 +399,7 @@ namespace Oxide.Plugins
                         break;
                     case "wipecm":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].wipeCorpseMain = !spawnpoints[monname].wipeCorpseMain;
@@ -404,7 +409,7 @@ namespace Oxide.Plugins
                         break;
                     case "drop":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].dropWeapon = !spawnpoints[monname].dropWeapon;
@@ -414,7 +419,7 @@ namespace Oxide.Plugins
                         break;
                     case "hostile":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].hostile = !spawnpoints[monname].hostile;
@@ -424,7 +429,7 @@ namespace Oxide.Plugins
                         break;
                     case "silent":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].silent = !spawnpoints[monname].silent;
@@ -434,7 +439,7 @@ namespace Oxide.Plugins
                         break;
                     case "names":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
 
@@ -443,7 +448,7 @@ namespace Oxide.Plugins
                         break;
                     case "name":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(newarg.Count - 1);
@@ -475,7 +480,7 @@ namespace Oxide.Plugins
                     case "delete":
                         {
                             CuiHelper.DestroyUi(player, NPCGUI);
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
 
@@ -496,7 +501,7 @@ namespace Oxide.Plugins
                     case "gothere":
                         {
                             CuiHelper.DestroyUi(player, NPCGUI);
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             Vector3 newpos = spawnpoints[monname].monpos;
@@ -506,7 +511,7 @@ namespace Oxide.Plugins
                         break;
                     case "spawnhere":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             spawnpoints[monname].monpos = player.transform.position;
@@ -516,7 +521,7 @@ namespace Oxide.Plugins
                         break;
                     case "respawn":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
 
@@ -535,7 +540,7 @@ namespace Oxide.Plugins
                         break;
                     case "selkit":
                         {
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             NPCKitSelectGUI(player, monname);
@@ -546,7 +551,7 @@ namespace Oxide.Plugins
                         {
                             CuiHelper.DestroyUi(player, NPCGUK);
                             string kit = args[1];
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
@@ -583,7 +588,7 @@ namespace Oxide.Plugins
                         if (args.Length > 1)
                         {
                             CuiHelper.DestroyUi(player, NPCGUM);
-                            List<string> newarg = new List<string>(args);
+                            List<string> newarg = new(args);
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
                             NPCProfileEditGUI(player, monname);
@@ -696,15 +701,39 @@ namespace Oxide.Plugins
                     DoLog("Setting brain object");
                     bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
                     bot.Brain.Navigator.DefaultArea = "Walkable";
-                    bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
-                    bot.Brain.ForceSetAge(0);
-                    bot.Brain.TargetLostRange = mono.info.detectRange;
-                    bot.Brain.HostileTargetsOnly = !mono.info.hostile;
+                    bot.Brain.Navigator.Agent.autoRepath = true;
+                    bot.Brain.Navigator.enabled = true;
+                    bot.Brain.Navigator.CanUseNavMesh = true;
                     bot.Brain.Navigator.BestCoverPointMaxDistance = mono.info.roamRange / 2;
                     bot.Brain.Navigator.BestRoamPointMaxDistance = mono.info.roamRange;
                     bot.Brain.Navigator.MaxRoamDistanceFromHome = mono.info.roamRange;
-                    bot.Brain.Senses.Init(bot, bot.Brain, 5f, mono.info.roamRange, mono.info.detectRange, -1f, true, false, true, mono.info.detectRange, !mono.info.hostile, false, true, EntityType.Player, false);
-                    bot.Brain.Navigator.Resume();
+                    bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
+                    bot.Brain.Navigator.SetDestination(pos, BaseNavigator.NavigationSpeed.Slow, 0f, 0f);
+
+                    bot.Brain.ForceSetAge(0);
+                    bot.Brain.AllowedToSleep = false;
+                    bot.Brain.sleeping = false;
+                    bot.Brain.SenseRange = mono.info.detectRange;
+                    bot.Brain.ListenRange = mono.info.detectRange * 2;
+                    bot.Brain.TargetLostRange = mono.info.detectRange;
+                    bot.Brain.HostileTargetsOnly = false;
+                    bot.Brain.IgnoreSafeZonePlayers = true;
+
+                    //bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
+                    //bot.Brain.Navigator.DefaultArea = "Walkable";
+                    //bot.Brain.Navigator.enabled = true;
+                    //bot.Brain.Navigator.CanUseNavMesh = true;
+                    //bot.Brain.Navigator.Agent.autoRepath = true;
+                    //bot.Brain.Navigator.Init(bot, bot.Brain.Navigator.Agent);
+                    //bot.Brain.Navigator.SetDestination(pos, BaseNavigator.NavigationSpeed.Slow, 0f, 0f);
+                    //bot.Brain.ForceSetAge(0);
+                    //bot.Brain.TargetLostRange = mono.info.detectRange;
+                    //bot.Brain.HostileTargetsOnly = !mono.info.hostile;
+                    //bot.Brain.Navigator.BestCoverPointMaxDistance = mono.info.roamRange / 2;
+                    //bot.Brain.Navigator.BestRoamPointMaxDistance = mono.info.roamRange;
+                    //bot.Brain.Navigator.MaxRoamDistanceFromHome = mono.info.roamRange;
+                    //bot.Brain.Senses.Init(bot, bot.Brain, 5f, mono.info.roamRange, mono.info.detectRange, -1f, true, false, true, mono.info.detectRange, !mono.info.hostile, false, true, EntityType.Player, false);
+                    //bot.Brain.Navigator.Resume();
 
                     DoLog("Setting name and inventory");
                     bot.displayName = botname;
@@ -970,7 +999,7 @@ namespace Oxide.Plugins
                 if (npc.activeItem != null)
                 {
                     DoLog($"Dropping {npc.info.displayName}'s activeItem: {npc.activeItem.info.shortname}");
-                    Vector3 vector3 = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.2f, UnityEngine.Random.Range(-2f, 2f));
+                    Vector3 vector3 = new(UnityEngine.Random.Range(-2f, 2f), 0.2f, UnityEngine.Random.Range(-2f, 2f));
                     npc.activeItem.Drop(humannpc.GetDropPosition(), humannpc.GetInheritedDropVelocity() + (vector3.normalized * 3f));
                     humannpc.svActiveItemID.Value = 0;
                 }
@@ -1763,7 +1792,7 @@ namespace Oxide.Plugins
             int col = 0;
             int row = 0;
 
-            List<string> kits = new List<string>();
+            List<string> kits = new();
             Kits?.CallHook("GetKitNames", kits);
             foreach (string kitinfo in kits)
             {
@@ -1875,6 +1904,7 @@ namespace Oxide.Plugins
 
         private void AddProfile(Vector3 location, string profile, string mongroupname = "", int quantity = 0)
         {
+            int spawnr = mongroupname.Contains("ighthouse") ? 60 : 30;
             // monname could be a monument/profile name or the string value of a ZoneManager zoneid, etc., if mongroupname is set.
             // Er... maybe?
             // Or, profile should be the mongroupname if set, defaulting to profile name if not set.
@@ -1895,7 +1925,7 @@ namespace Oxide.Plugins
                 invulnerable = false,
                 dropWeapon = false,
                 spawnCount = quantity,
-                spawnRange = 30,
+                spawnRange = spawnr,
                 detectRange = 60f,
                 roamRange = 140f,
                 names = new List<string>(),
@@ -1910,7 +1940,7 @@ namespace Oxide.Plugins
         public class Inventories
         {
             // Used to store inventory on death for selective restoration into the corpse
-            public List<ItemInfo>[] inventory = { new List<ItemInfo>(), new List<ItemInfo>(), new List<ItemInfo>() };
+            public List<ItemInfo>[] inventory = { new(), new(), new() };
         }
 
         public class ItemInfo
@@ -1945,7 +1975,7 @@ namespace Oxide.Plugins
             public List<string> names;
             public List<ulong> ids;
             public List<Vector3> pos;
-            public List<string> zonemap = new List<string>();
+            public List<string> zonemap = new();
         }
 
         public class MonBotInfo
@@ -1954,7 +1984,7 @@ namespace Oxide.Plugins
             public ulong userid;
             public string displayName;
             public string kit;
-            public Dictionary<DamageType, float> protections = new Dictionary<DamageType, float>();
+            public Dictionary<DamageType, float> protections = new();
             public Timer pausetimer;
 
             // Logic
@@ -2061,7 +2091,8 @@ namespace Oxide.Plugins
                 player.Brain.Navigator.BestRoamPointMaxDistance = info.roamRange;
                 player.Brain.Navigator.MaxRoamDistanceFromHome = info.roamRange;
                 player.Brain.Navigator.Init(player, player.Brain.Navigator.Agent);
-                player.Brain.Navigator.SetDestination(spawnPos, BaseNavigator.NavigationSpeed.Normal, 0f, 0f);
+                player.Brain.Navigator.SetDestination(spawnPos, BaseNavigator.NavigationSpeed.Slow, 0f, 0f);
+                player.Brain.SetGroupRoamRootPosition(spawnPos);
                 #endregion
 
                 #region senses & Targeting
@@ -2103,33 +2134,39 @@ namespace Oxide.Plugins
 
             private void DoTriggerDown()
             {
-                BasePlayer attackPlayer = player.Brain.Senses.Players.First()?.ToPlayer();
-
-                if (attackPlayer != null)
+                if (player == null) return;
+                try
                 {
-                    player.Brain.Navigator.SetDestination(attackPlayer.transform.position, BaseNavigator.NavigationSpeed.Fast, 0f, 0f);
+                    BasePlayer attackPlayer = player?.Brain?.Senses?.Players?.First()?.ToPlayer();
 
-                    if (Vector3.Distance(player.transform.position, attackPlayer.transform.position) <= melee.maxDistance)
+                    if (attackPlayer != null)
                     {
-                        if (canHurt)
-                        {
-                            Instance.DoLog($"TriggerDown on {attackPlayer.displayName}");
-                            //player.TriggerDown();
-                            melee.ServerUse(player.damageScale);
+                        player?.Brain.Navigator.SetDestination(attackPlayer.transform.position, BaseNavigator.NavigationSpeed.Fast, 0f, 0f);
 
-                            Instance.timer.Once(triggerDelay, () =>
+                        if (Vector3.Distance(player.transform.position, attackPlayer.transform.position) <= melee.maxDistance)
+                        {
+                            if (canHurt)
                             {
-                                Instance.DoLog($"Trigger delay: {triggerDelay}");
-                                attackPlayer.Hurt(melee.TotalDamage(), DamageType.Slash, player, true);
-                                Effect.server.Run("assets/bundled/prefabs/fx/headshot.prefab", attackPlayer.transform.position);
-                                canHurt = false;
-                                Invoke("ResetCanHurt", 0.5f);
-                            });
+                                Instance.DoLog($"TriggerDown on {attackPlayer.displayName}");
+                                //player.TriggerDown();
+                                melee.ServerUse(player.damageScale);
+
+                                Instance.timer.Once(triggerDelay, () =>
+                                {
+                                    Instance.DoLog($"Trigger delay: {triggerDelay}");
+                                    attackPlayer.Hurt(melee.TotalDamage(), DamageType.Slash, player, true);
+                                    Effect.server.Run("assets/bundled/prefabs/fx/headshot.prefab", attackPlayer.transform.position);
+                                    canHurt = false;
+                                    Invoke("ResetCanHurt", 0.5f);
+                                });
+                            }
                         }
+                        return;
                     }
-                    return;
+                    // Instance.Puts("EXIT");
+                    ResetCanHurt();
                 }
-                ResetCanHurt();
+                catch { }
             }
 
             private void ResetCanHurt()
@@ -2143,11 +2180,12 @@ namespace Oxide.Plugins
                 if (player?.IsDestroyed != false) return;
                 Instance.DoLog($"Silencing effects for {player?.UserIDString}@{info.monument}");
                 ScientistNPC npc = player as ScientistNPC;
-                npc.SetChatterType(ScientistNPC.RadioChatterType.NONE);
+                npc?.SetChatterType(ScientistNPC.RadioChatterType.NONE);
             }
 
             private void GoHome()
             {
+                if (player == null) return;
                 if (player?.IsDestroyed != false || player.isMounted)
                 {
                     return;
@@ -2176,8 +2214,29 @@ namespace Oxide.Plugins
                 }
                 else
                 {
+                    Vector3 random = UnityEngine.Random.insideUnitCircle.normalized * 10f;
+                    Vector3 newPos = GetNavPoint(spawnPos + new Vector3(random.x, 0f, random.y));
                     player.Brain.Navigator.SetDestination(spawnPos);
                 }
+            }
+
+            // From BradleyGuards - Thanks, K.
+            public Vector3 GetNavPoint(Vector3 position)
+            {
+                if (!NavMesh.SamplePosition(position, out NavMeshHit hit, 5, -1))
+                {
+                    return position;
+                }
+                else if (Physics.RaycastAll(hit.position + new Vector3(0, 100, 0), Vector3.down, 99f, 1235288065).Any())
+                {
+                    return position;
+                }
+                else if (hit.position.y < TerrainMeta.WaterMap.GetHeight(hit.position))
+                {
+                    return position;
+                }
+                position = hit.position;
+                return position;
             }
 
             public void UpdateHealth(MonBotInfo info)
@@ -2386,7 +2445,7 @@ namespace Oxide.Plugins
             player.Teleport(position);
             player.UpdateNetworkGroup();
             player.StartSleeping();
-            player.SendNetworkUpdateImmediate(false);
+            player.SendNetworkUpdateImmediate();
 
             if (player.net?.connection != null)
             {
@@ -2488,7 +2547,7 @@ namespace Oxide.Plugins
         protected override void LoadDefaultConfig()
         {
             Puts("Creating new config file.");
-            ConfigData config = new ConfigData
+            ConfigData config = new()
             {
                 Options = new Options()
                 {
@@ -2521,7 +2580,7 @@ namespace Oxide.Plugins
 
         public class ConfigData
         {
-            public Options Options = new Options();
+            public Options Options = new();
             public VersionNumber Version;
         }
 
