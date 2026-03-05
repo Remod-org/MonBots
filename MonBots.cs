@@ -34,7 +34,7 @@ using UnityEngine.AI;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.25")]
+    [Info("MonBots", "RFC1920", "1.0.26")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -2149,7 +2149,8 @@ namespace Oxide.Plugins
                             {
                                 Instance.DoLog($"TriggerDown on {attackPlayer.displayName}");
                                 //player.TriggerDown();
-                                melee.ServerUse(player.damageScale);
+                                melee.ServerUse(new HeldEntityServerUseParams(player.damageScale));
+                                //melee.ServerUse(player.damageScale);
 
                                 Instance.timer.Once(triggerDelay, () =>
                                 {
