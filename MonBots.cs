@@ -1,7 +1,7 @@
 #region License (GPL v2)
 /*
     MonBots - NPC Players that protect monuments, sort of
-    Copyright (c) 2021-2023 RFC1920 <desolationoutpostpve@gmail.com>
+    Copyright (c) 2021 RFC1920 <desolationoutpostpve@gmail.com>
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License v2.0.
@@ -34,7 +34,7 @@ using UnityEngine.AI;
 
 namespace Oxide.Plugins
 {
-    [Info("MonBots", "RFC1920", "1.0.26")]
+    [Info("MonBots", "RFC1920", "1.0.27")]
     [Description("Adds interactive NPCs at various monuments")]
     internal class MonBots : RustPlugin
     {
@@ -184,7 +184,8 @@ namespace Oxide.Plugins
                 }
             }
 
-            MonBotPlayer[] bots = UnityEngine.Object.FindObjectsOfType<MonBotPlayer>();
+            //MonBotPlayer[] bots = UnityEngine.Object.FindObjects<MonBotPlayer>();
+            MonBotPlayer[] bots = (MonBotPlayer[]) UnityEngine.Object.FindObjectsByType(typeof(MonBotPlayer), FindObjectsSortMode.InstanceID);
             if (bots != null)
             {
                 foreach (MonBotPlayer bot in bots)
@@ -484,7 +485,8 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
 
-                            foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsOfType<MonBotPlayer>())
+                            //foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsOfType<MonBotPlayer>())
+                            foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsByType(typeof(MonBotPlayer), FindObjectsSortMode.InstanceID))
                             {
                                 if (bot.info.monument == monname)
                                 {
@@ -525,7 +527,8 @@ namespace Oxide.Plugins
                             newarg.RemoveAt(0);
                             string monname = string.Join(" ", newarg);
 
-                            foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsOfType<MonBotPlayer>())
+                            //foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsOfType<MonBotPlayer>())
+                            foreach (MonBotPlayer bot in UnityEngine.Object.FindObjectsByType(typeof(MonBotPlayer), FindObjectsSortMode.InstanceID))
                             {
                                 if (bot.info.monument == monname)
                                 {
@@ -701,7 +704,8 @@ namespace Oxide.Plugins
                     DoLog("Setting brain object");
                     bot.Brain.Navigator.Agent.agentTypeID = -1372625422;
                     bot.Brain.Navigator.DefaultArea = "Walkable";
-                    bot.Brain.Navigator.Agent.autoRepath = true;
+                    //bot.Brain.Navigator.Agent.autoRepath = true;
+                    bot.Brain.Navigator.Agent.autoBraking = true;
                     bot.Brain.Navigator.enabled = true;
                     bot.Brain.Navigator.CanUseNavMesh = true;
                     bot.Brain.Navigator.BestCoverPointMaxDistance = mono.info.roamRange / 2;
@@ -803,7 +807,7 @@ namespace Oxide.Plugins
                         }
                         else
                         {
-                            kit = sp.Value.kits.GetRandom();
+                            kit = sp.Value.kits.GetRandom() ?? "";
                         }
 
                         SpawnBot(sp.Value, spawnPos, kit);
@@ -2084,7 +2088,8 @@ namespace Oxide.Plugins
                 #region navigation
                 player.Brain.Navigator.Agent.agentTypeID = -1372625422;
                 player.Brain.Navigator.DefaultArea = "Walkable";
-                player.Brain.Navigator.Agent.autoRepath = true;
+                //player.Brain.Navigator.Agent.autoRepath = true;
+                player.Brain.Navigator.Agent.autoBraking = true;
                 player.Brain.Navigator.enabled = true;
                 player.Brain.Navigator.CanUseNavMesh = true;
                 player.Brain.Navigator.BestCoverPointMaxDistance = info.roamRange / 2;
@@ -2488,7 +2493,8 @@ namespace Oxide.Plugins
 
         private void FindMonuments()
         {
-            foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsOfType<MonumentInfo>())
+            //foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsOfType<MonumentInfo>())
+            foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsByType(typeof(MonumentInfo), FindObjectsSortMode.InstanceID))
             {
                 if (monument.name.Contains("power_sub"))
                 {
